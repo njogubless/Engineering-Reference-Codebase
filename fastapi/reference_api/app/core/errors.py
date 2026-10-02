@@ -19,6 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from app.core.request_context import get_request_id
 
@@ -68,6 +69,13 @@ _PYDANTIC_CODES = {
     "greater_than_equal": "min_value",
     "less_than": "max_value",
     "less_than_equal": "max_value",
+    "literal_error": "invalid_choice",
+    "enum": "invalid_choice",
+    "extra_forbidden": "unknown_field",
+    "value_error": "invalid",
+    "uuid_parsing": "invalid",
+    "string_type": "invalid",
+    "string_unicode": "surrogate_characters_not_allowed",  # DRF's code for the same input
 }
 
 
@@ -86,10 +94,35 @@ class AppError(Exception):
 
     status_code = 500
     code = "internal_error"
+    headers: dict[str, str] | None = None
 
     def __init__(self, detail: str | None = None) -> None:
         super().__init__(detail)
         self.detail = detail
+
+
+class AuthenticationError(AppError):
+    status_code = 401
+    code = "authentication_error"
+    # RFC 6750: a 401 must tell the client which scheme to use.
+    headers = {"WWW-Authenticate": 'Bearer realm="api"'}  # noqa: RUF012
+
+
+class ValidationFailedError(AppError):
+    """A domain rule failed (not a malformed request). Carries field errors like Pydantic's."""
+
+    status_code = 422
+    code = "validation_error"
+
+    def __init__(
+        self, errors: Sequence["FieldError"], detail: str = "One or more fields are invalid."
+    ) -> None:
+        super().__init__(detail)
+        self.errors = list(errors)
+
+    @classmethod
+    def field(cls, field: str | None, code: str, message: str) -> "ValidationFailedError":
+        return cls([FieldError(field=field, code=code, message=message)])
 
 
 class NotFoundError(AppError):
@@ -184,7 +217,12 @@ async def handle_app_error(request: Request, exc: Exception) -> JSONResponse:
     if exc.status_code >= 500:
         logger.error("app_error", extra={"code": exc.code}, exc_info=exc)
     return problem_response(
-        status_code=exc.status_code, code=exc.code, detail=exc.detail, instance=request.url.path
+        status_code=exc.status_code,
+        code=exc.code,
+        detail=exc.detail,
+        instance=request.url.path,
+        errors=exc.errors if isinstance(exc, ValidationFailedError) else (),
+        headers=exc.headers,
     )
 
 
@@ -225,6 +263,10 @@ async def handle_http_exception(request: Request, exc: Exception) -> JSONRespons
         exc.status_code, "bad_request" if exc.status_code < 500 else "internal_error"
     )
     headers = dict(exc.headers or {})
+    if exc.status_code == 405:
+        # RFC 9110: a 405 must list the allowed methods. FastAPI registers one
+        # route per method, so Starlette only reports the first route's methods.
+        headers["Allow"] = ", ".join(_allowed_methods(request))
     extensions: dict[str, Any] = {}
     if exc.status_code == 429 and "Retry-After" in headers:
         extensions["retry_after"] = int(headers["Retry-After"])
@@ -237,6 +279,23 @@ async def handle_http_exception(request: Request, exc: Exception) -> JSONRespons
         headers=headers,
         **extensions,
     )
+
+
+_CANDIDATE_METHODS = ("DELETE", "GET", "PATCH", "POST", "PUT")
+
+
+def _allowed_methods(request: Request) -> list[str]:
+    """Methods with a route for this path, asked through the public
+    `BaseRoute.matches()` API (FastAPI nests included routers, so route
+    lists cannot simply be scanned)."""
+    routes = request.app.router.routes
+    return [
+        method
+        for method in _CANDIDATE_METHODS
+        if any(
+            route.matches({**request.scope, "method": method})[0] is Match.FULL for route in routes
+        )
+    ]
 
 
 def _is_json(content_type: str) -> bool:

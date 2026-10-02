@@ -55,7 +55,45 @@ API has dozens of models. That alternative is documented, not adopted.
 - Errors: `Problem` (RFC 9457) with the `ErrorCode` enum ([30-error-handling](../30-error-handling/README.md)).
 - Versioning: `/api/v1/...` (health probes are unversioned).
 - `X-Request-ID` header on every response.
-- Pagination shapes (`CursorPage`, `OffsetPage`) arrive with the first list endpoint in Phase 2.
+- Pagination: `CursorPage` with `next_cursor` (see [11-pagination](../11-pagination/README.md)).
+- Security: bearer JWT by default (top-level `security`); public operations opt out with `security: []`.
+- Input strictness: unknown body fields → 422 `unknown_field`; wrong JSON types are
+  rejected, never coerced; NUL and unpaired surrogates → 422; unknown query
+  parameters are ignored.
+
+## What the contract tests found
+
+Phase 2 added authenticated Schemathesis runs against both backends. The
+first runs failed 12 operations, and later randomized runs kept finding more. Every failure was real, and each led to a
+change in code, contract or test configuration:
+
+| Finding | Backend | Fix |
+|---|---|---|
+| A NUL byte in a login email reached PostgreSQL → **500** | FastAPI | `SafeChars` validator (NUL / unpaired surrogates → 422, DRF's codes) |
+| `"\f"` as a title was stripped to `""` *after* the length check; the DB `CHECK` refused it → **500** | FastAPI | Pydantic metadata order: constraints first, custom validator last (regression test) |
+| `{"refresh": 0}` accepted: DRF coerced the number to `"0"` | Django | `StrictInputMixin`: string fields accept only JSON strings |
+| Unknown fields reported alone, hiding the other field errors | Django | report all errors at once, as Pydantic does |
+| 405 without a complete `Allow` header (FastAPI nests routers; Starlette saw one route) | FastAPI | compute `Allow` through `BaseRoute.matches()` |
+| Password "too similar" check stricter in FastAPI (substring) than Django (similarity ratio) | FastAPI | ported Django's algorithm: both accept the same passwords |
+| Empty strings and whitespace-only titles were schema-valid | contract | `minLength: 1` + a `non_blank` pattern |
+| `"\x1f"` matched JSON Schema's `\S` but Python's `str.strip()` removes it, so "valid" titles were rejected | contract | `non_blank` lists Python's exact whitespace set; a test checks all 1.1M code points |
+| Pydantic's `strip_whitespace` (Rust, Unicode `White_Space`) keeps `"\x1d"`; DRF strips it, so a title was accepted by one backend only | FastAPI | `PythonStrip` validator: trim the way DRF does |
+| A whitespace-only refresh token: 422 from Django (DRF trims), 401/204 from FastAPI | both + contract | `non_blank` on token fields; FastAPI `NonBlank` (rejects without altering the token) |
+| **simplejwt trims the login password** while registration doesn't: a password ending in a space could be set but never used | Django | `ObtainTokenSerializer` with an untrimmed `PasswordField` (regression test) |
+| DRF skips invalid base64 characters in cursors, so a 600-character garbage cursor served page 1 | Django | strict base64 + length check before DRF decodes |
+
+**Deterministic gate, exploratory fuzzing.** Random inputs kept finding new
+issues across runs, which is valuable, but in CI it means a red build for an
+unrelated change. `make check-contract` is therefore deterministic (same
+commit, same result), and `make fuzz-contract` runs 500 fresh random examples
+per operation. Every fuzzing finding becomes a regression test in the
+backend's own suite.
+
+Configuration (`tests/contract/schemathesis.toml`) records the deliberate
+exceptions: 422 is an expected answer for business rules a schema can't
+express (password strength, opaque cursors); unknown query parameters are
+ignored by design; NUL bytes are excluded from generation because the
+contract forbids them and each backend tests that directly.
 
 ## When not to use design-first
 

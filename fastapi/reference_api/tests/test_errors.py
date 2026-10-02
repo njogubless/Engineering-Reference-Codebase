@@ -138,3 +138,9 @@ def test_error_responses_carry_cors_headers_for_allowed_origins(client: TestClie
     assert response.status_code == 500
     assert response.headers["access-control-allow-origin"] == "http://app.test"
     assert "x-request-id" in response.headers["access-control-expose-headers"].lower()
+
+
+def test_405_lists_every_allowed_method(client: TestClient):
+    response = client.put("/api/v1/posts/00000000-0000-7000-8000-000000000000")
+    assert response.status_code == 405
+    assert response.headers["allow"] == "DELETE, GET, PATCH"

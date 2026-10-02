@@ -15,7 +15,7 @@ must pass are in [implementation-roadmap.md § Definition of Done](implementatio
 `Platform` = Firebase rules/emulator, Docker, CI, Postgres/Redis configuration, or `contracts/`.
 `Docs` = concept README in `docs/patterns/` or `docs/common-problems/`.
 
-_Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, React 58, Flutter 36, contract 12), dependency audits clean, and both demos run in a real browser (React → Django, Flutter web → FastAPI)._
+_Last verified: 2026-10-02 (Phase 2a) — `make check` green: Django 117 tests, FastAPI 88, React 58, Flutter 36, contract 48 (authenticated, deterministic Schemathesis on both backends)._
 
 ## Foundations & cross-cutting
 
@@ -37,6 +37,7 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | CORS (incl. on error responses, exposed headers) | ➖ | ➖ | ✅ | ✅ | ➖ | ✅ | 1 |
 | API client (verbs, timeouts, cancel, error mapping) | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | 1 |
 | Client retry with backoff + jitter (idempotent only, one layer) | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | 1 |
+| Strict input (unknown fields, no type coercion, NUL/surrogates, all errors at once) | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | 2a |
 | Outbound retry/backoff for provider calls | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 11 |
 
 ¹ Workflows and Dependabot config are written and YAML-validated, and every step they run passes locally via the same Makefile targets, but they have not yet run on GitHub (no remote configured).
@@ -47,12 +48,12 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 
 | Pattern | Flutter | React | Django | FastAPI | Platform | Docs | Phase |
 |---|---|---|---|---|---|---|---|
-| Domain models, constraints, indexes, migrations | ➖ | ➖ | ⬜ | ⬜ | ⬜ | ⬜ | 2 |
-| CRUD resource (Posts/Comments) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 2 |
-| Contract conformance tests | ➖ | ➖ | ⬜ | ⬜ | ⬜ | ⬜ | 2 |
-| Generated client types from OpenAPI | ⬜ | ⬜ | ➖ | ➖ | ⬜ | ⬜ | 2 |
-| DTO ↔ entity mapping | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 2 |
-| Repository / data source layering | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 2 |
+| Domain models, constraints, indexes, migrations | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | 2a |
+| CRUD resource (Posts/Comments) | ⬜ | ⬜ | ✅ | ✅ | ✅ | 🟨 ⁵ | 2a/2b |
+| Contract conformance tests (authenticated Schemathesis, error parity) | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | 2a |
+| Generated client types from OpenAPI | ⬜ | ✅ | ➖ | ➖ | ✅ | ✅ | 2 |
+| DTO ↔ entity mapping | ⬜ | ⬜ | ✅ | ✅ | ➖ | ⬜ | 2 |
+| Repository / data source layering | ⬜ | ⬜ | ✅ | ✅ | ➖ | ⬜ | 2 |
 | Firestore CRUD, streams, queries, ordering | ⬜ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 2 |
 | Firestore transactions, batched writes, subcollections | ⬜ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 2 |
 | Riverpod provider types (each with a reason) | ⬜ | ➖ | ➖ | ➖ | ➖ | ⬜ | 2 |
@@ -60,7 +61,13 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | Server-state cache + invalidation | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
 | State categories (local/server/form/URL/global) | ➖ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
 | Optimistic update + rollback | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| Date/time handling (UTC wire, local display) | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 2 |
+| Date/time handling (UTC wire, local display) | ⬜ | ⬜ | ✅ | ✅ | ➖ | 🟨 | 2 |
+
+⁵ Backends complete; React and Flutter clients arrive in Phase 2b. A dedicated data-access README (08) comes with 2b.
+⁶ Register, login, logout and `/me` are done; password reset and email verification need transactional email (Phase 3 with Mailpit).
+⁷ Author-only writes; visible-but-not-yours → 403, invisible → 404. Roles and RBAC are Phase 4.
+⁸ Query counts are asserted (1 per post page; FastAPI relationships use `lazy="raise"`), but the bad-vs-good demo is Phase 7.
+⁹ Argon2id with constant-time-equivalent login (dummy hash for unknown emails); brute-force throttling is Phase 14.
 
 ## Authentication
 
@@ -71,9 +78,9 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | Firebase phone OTP (send/verify/resend/timeout/invalid) | ⬜ | ⬜ | ➖ | ➖ | ⬜ | ⬜ | 3 |
 | Auth state machine + session restoration | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 3 |
 | Firebase ID-token verification → local user | ➖ | ➖ | ⬜ | ⬜ | ⬜ | ⬜ | 3 |
-| First-party register/login/logout/reset/verify email | ➖ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 3 |
+| First-party register/login/logout/reset/verify email | ➖ | ⬜ | 🟨 ⁶ | 🟨 ⁶ | ➖ | 🟨 | 2a/3 |
 | Session auth + CSRF | ➖ | ➖ | ⬜ | ➖ | ➖ | ⬜ | 3 |
-| Access + rotating refresh tokens, revocation | ➖ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 3 |
+| Access + rotating refresh tokens, revocation (FastAPI: reuse detection) | ➖ | ⬜ | ✅ | ✅ | ➖ | ✅ | 2a |
 | Single-flight refresh interceptor | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 3 |
 | Secure token storage (bad vs good) | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 3 |
 
@@ -82,7 +89,7 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | Pattern | Flutter | React | Django | FastAPI | Platform | Docs | Phase |
 |---|---|---|---|---|---|---|---|
 | RBAC (user/manager/admin/superadmin) | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 4 |
-| Object-level / ownership permissions | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 4 |
+| Object-level / ownership permissions | ➖ | ➖ | 🟨 ⁷ | 🟨 ⁷ | ➖ | ⬜ | 2a/4 |
 | Staff/admin access, admin hardening | ➖ | ➖ | ⬜ | ➖ | ➖ | ⬜ | 4 |
 | Client permission state | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 4 |
 | Firestore/Storage security rules + rules tests | ➖ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 4 |
@@ -103,7 +110,7 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | Async + server validation → field errors | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 5 |
 | Double-submit prevention | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 5 |
 | Offset pagination | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 6 |
-| Cursor / keyset pagination | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 6 |
+| Cursor / keyset pagination | ⬜ | ⬜ | ✅ | ✅ | ➖ | ✅ | 2a |
 | Firestore cursor pagination | ⬜ | ➖ | ➖ | ➖ | ➖ | ⬜ | 6 |
 | Infinite scroll, pull-to-refresh, end-of-list, dedupe | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 6 |
 | Unbounded query (bad vs good) | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 6 |
@@ -117,7 +124,8 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 
 | Pattern | Flutter | React | Django | FastAPI | Platform | Docs | Phase |
 |---|---|---|---|---|---|---|---|
-| N+1 queries (bad vs good, query-count tests) | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 7 |
+| N+1 queries (bad vs good, query-count tests) | ➖ | ➖ | 🟨 ⁸ | 🟨 ⁸ | ➖ | ⬜ | 7 |
+| Index-defeating lookups (EXPLAIN-tested) | ➖ | ➖ | ✅ | ➖ | ➖ | ✅ | 2a |
 | Annotations + aggregations | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 7 |
 | Soft deletion | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 7 |
 | Audit log | ➖ | ➖ | ⬜ | ➖ | ➖ | ⬜ | 7 |
@@ -211,7 +219,7 @@ _Last verified: 2026-10-02 — `make check` green (Django 56 tests, FastAPI 35, 
 | CSRF, secure headers, CSP (CORS done in Phase 1) | ➖ | ⬜ | 🟨 ⁴ | ⬜ | ⬜ | 🟨 | 14 |
 | SQL injection (bad vs good) | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 14 |
 | XSS (bad vs good) | ➖ | ⬜ | ⬜ | ➖ | ➖ | ⬜ | 14 |
-| Password hashing + brute-force protection | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 14 |
+| Password hashing + brute-force protection | ➖ | ➖ | 🟨 ⁹ | 🟨 ⁹ | ➖ | 🟨 | 2a/14 |
 | Secrets management + secret scanning | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 14 |
 | Dependency + container scanning | ➖ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 14 |
 | PII minimization, account deletion, data export | ⬜ | ➖ | ⬜ | ➖ | ➖ | ⬜ | 14 |

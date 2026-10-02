@@ -12,6 +12,7 @@ Rules demonstrated here:
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -35,6 +36,10 @@ if ENVIRONMENT not in ENVIRONMENTS:
     raise ImproperlyConfigured(f"ENVIRONMENT must be one of {ENVIRONMENTS}, got {ENVIRONMENT!r}")
 
 SECRET_KEY = env.str("SECRET_KEY")
+# SECRET_KEY also signs JWTs (HMAC-SHA256), which needs at least 32 bytes in
+# every environment — a short key makes tokens brute-forceable.
+if len(SECRET_KEY.encode()) < 32:
+    raise ImproperlyConfigured("SECRET_KEY must be at least 32 bytes.")
 DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS: list[str] = env.list("ALLOWED_HOSTS", default=[])
 
@@ -60,9 +65,15 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "corsheaders",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "apps.core",
+    "apps.accounts",
+    "apps.posts",
 ]
+
+# Set before the first migration; changing it later means rewriting live auth tables.
+AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
     # First, so every later middleware, view and log line sees the request ID.
@@ -103,6 +114,23 @@ CACHES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Passwords ------------------------------------------------------------------
+# Argon2id first: memory-hard, the current OWASP recommendation. Hashes made
+# with older hashers are upgraded on next login.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -138,11 +166,26 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     # Deny by default: every public endpoint opts out explicitly.
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    # Authentication classes are added in Phase 3 (authentication).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "UNAUTHENTICATED_USER": None,
+    # Bearer access tokens. Because this authenticator sends a
+    # `WWW-Authenticate` challenge, missing credentials are 401, not 403.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
     "EXCEPTION_HANDLER": "apps.core.errors.problem_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # Rotation: each refresh returns a new refresh token and blacklists the
+    # old one, so a leaked refresh token stops working after one use.
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "sub",
 }
 
 SPECTACULAR_SETTINGS = {

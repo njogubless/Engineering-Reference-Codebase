@@ -109,7 +109,7 @@ def test_unknown_url_returns_problem_json_not_html(client):
 
 def test_views_are_deny_by_default(client):
     response = client.get("/t/default-permission")
-    assert_problem(response, 403, "authorization_error")
+    assert_problem(response, 401, "authentication_error")
     assert "secret" not in response.content.decode()
 
 
