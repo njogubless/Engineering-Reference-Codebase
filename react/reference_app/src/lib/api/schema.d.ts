@@ -67,6 +67,211 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/register': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create an account.
+     * @description Returns the new user; sign in with `POST /api/v1/auth/token`.
+     */
+    post: operations['register'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Exchange email + password for an access and a refresh token.
+     * @description Wrong email and wrong password give the same 401, so the endpoint does not reveal which emails exist.
+     */
+    post: operations['obtainToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/token/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rotate a refresh token.
+     * @description Returns a new access token and a NEW refresh token. The submitted
+     *     refresh token stops working (rotation), so a stolen token has a short
+     *     useful life.
+     */
+    post: operations['refreshToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Revoke a refresh token.
+     * @description Access tokens are short-lived and expire on their own; logging out revokes the refresh token.
+     */
+    post: operations['logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The authenticated user.
+     * @description Clients call this after sign-in and on startup to restore the session.
+     */
+    get: operations['getCurrentUser'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/posts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Published posts, newest first (cursor pagination).
+     * @description Ordered by `created_at` then `id`, so pages are stable even when posts share a timestamp. Drafts never appear here.
+     */
+    get: operations['listPosts'];
+    put?: never;
+    /**
+     * Create a post owned by the authenticated user.
+     * @description The author is always the authenticated user; an author in the body is rejected. `status` defaults to `draft`; publishing sets `published_at`.
+     */
+    post: operations['createPost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/posts/{post_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * A published post, or the requester's own draft.
+     * @description Other users' drafts are reported as 404, not 403, so their existence is not revealed.
+     */
+    get: operations['getPost'];
+    put?: never;
+    post?: never;
+    /**
+     * Delete a post and its comments (author only).
+     * @description Same visibility rules as update. Deleting removes the post's comments.
+     */
+    delete: operations['deletePost'];
+    options?: never;
+    head?: never;
+    /**
+     * Partially update a post (author only).
+     * @description Non-authors get 403 for a post they can see and 404 for a draft they cannot. Publishing sets `published_at`; unpublishing clears it.
+     */
+    patch: operations['updatePost'];
+    trace?: never;
+  };
+  '/api/v1/posts/{post_id}/comments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    /**
+     * Comments on a published post, oldest first (cursor pagination).
+     * @description Each comment embeds its author, so listing comments costs a fixed number of queries regardless of page size (no N+1).
+     */
+    get: operations['listComments'];
+    put?: never;
+    /**
+     * Comment on a published post.
+     * @description Drafts cannot be commented on (404 for other users' drafts, 422 for your own).
+     */
+    post: operations['createComment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/posts/{post_id}/comments/{comment_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+        comment_id: string;
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete a comment (comment author only).
+     * @description The comment must belong to the post in the path; a mismatched pair is 404.
+     */
+    delete: operations['deleteComment'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -109,6 +314,96 @@ export interface components {
       /** @description Seconds until retrying is useful (only for `rate_limited`). */
       retry_after?: number;
     };
+    /** @description Base shape for keyset-paginated lists. Concrete lists narrow `items` via allOf. */
+    CursorPage: {
+      items: unknown[];
+      /** @description Opaque cursor for the next page; null at the end of the list. */
+      next_cursor: string | null;
+    };
+    User: {
+      /** Format: uuid */
+      id: string;
+      /** Format: email */
+      email: string;
+      display_name: string;
+      /** Format: date-time */
+      date_joined: string;
+    };
+    RegisterRequest: {
+      /** Format: email */
+      email: string;
+      password: string;
+      display_name: string;
+    };
+    TokenRequest: {
+      email: string;
+      password: string;
+    };
+    RefreshRequest: {
+      refresh: string;
+    };
+    TokenPair: {
+      /** @description Short-lived JWT for the Authorization header. */
+      access: string;
+      /** @description Long-lived, single-use token for POST /auth/token/refresh. */
+      refresh: string;
+    };
+    Author: {
+      /** Format: uuid */
+      id: string;
+      display_name: string;
+    };
+    /** @enum {string} */
+    PostStatus: 'draft' | 'published';
+    Post: {
+      /** Format: uuid */
+      id: string;
+      title: string;
+      body: string;
+      status: components['schemas']['PostStatus'];
+      author: components['schemas']['Author'];
+      comment_count: number;
+      /** Format: date-time */
+      created_at: string;
+      /** Format: date-time */
+      updated_at: string;
+      /**
+       * Format: date-time
+       * @description Set when the post is first published; null for drafts.
+       */
+      published_at: string | null;
+    };
+    PostCreate: {
+      /** @description Must contain a non-whitespace character; surrounding whitespace is trimmed. */
+      title: string;
+      /** @default  */
+      body: string;
+      status?: components['schemas']['PostStatus'];
+    };
+    PostUpdate: {
+      title?: string;
+      body?: string;
+      status?: components['schemas']['PostStatus'];
+    };
+    PostPage: components['schemas']['CursorPage'] & {
+      items?: components['schemas']['Post'][];
+    };
+    Comment: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      post_id: string;
+      body: string;
+      author: components['schemas']['Author'];
+      /** Format: date-time */
+      created_at: string;
+    };
+    CommentCreate: {
+      body: string;
+    };
+    CommentPage: components['schemas']['CursorPage'] & {
+      items?: components['schemas']['Comment'][];
+    };
     Liveness: {
       /** @constant */
       status: 'ok';
@@ -144,7 +439,13 @@ export interface components {
       };
     };
   };
-  parameters: never;
+  parameters: {
+    PostId: string;
+    /** @description Opaque cursor from a previous page's `next_cursor`. Do not construct or parse it. */
+    Cursor: string;
+    /** @description Page size (default 20). Values outside 1–100 are rejected, not silently clamped. */
+    Limit: number;
+  };
   requestBodies: never;
   headers: {
     /** @description Correlation ID. Echoes a valid incoming `X-Request-ID`, otherwise generated. */
@@ -224,6 +525,340 @@ export interface operations {
         content: {
           'application/json': components['schemas']['Meta'];
         };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  register: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegisterRequest'];
+      };
+    };
+    responses: {
+      /** @description Account created. */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['User'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  obtainToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TokenRequest'];
+      };
+    };
+    responses: {
+      /** @description Tokens issued. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TokenPair'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  refreshToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RefreshRequest'];
+      };
+    };
+    responses: {
+      /** @description Tokens rotated. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TokenPair'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RefreshRequest'];
+      };
+    };
+    responses: {
+      /**
+       * @description Always 204 for a well-formed request: an unknown, expired or
+       *     already-revoked token has nothing left to revoke, so logout is idempotent.
+       */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  getCurrentUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Current user. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['User'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  listPosts: {
+    parameters: {
+      query?: {
+        /** @description Opaque cursor from a previous page's `next_cursor`. Do not construct or parse it. */
+        cursor?: components['parameters']['Cursor'];
+        /** @description Page size (default 20). Values outside 1–100 are rejected, not silently clamped. */
+        limit?: components['parameters']['Limit'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description One page of posts. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PostPage'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  createPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PostCreate'];
+      };
+    };
+    responses: {
+      /** @description Created. */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Post'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  getPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The post. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Post'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  deletePost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted. */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  updatePost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PostUpdate'];
+      };
+    };
+    responses: {
+      /** @description Updated. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Post'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  listComments: {
+    parameters: {
+      query?: {
+        /** @description Opaque cursor from a previous page's `next_cursor`. Do not construct or parse it. */
+        cursor?: components['parameters']['Cursor'];
+        /** @description Page size (default 20). Values outside 1–100 are rejected, not silently clamped. */
+        limit?: components['parameters']['Limit'];
+      };
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description One page of comments. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CommentPage'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  createComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CommentCreate'];
+      };
+    };
+    responses: {
+      /** @description Created. */
+      201: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Comment'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  deleteComment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: components['parameters']['PostId'];
+        comment_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Deleted. */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       default: components['responses']['Problem'];
     };

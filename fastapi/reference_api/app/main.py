@@ -10,14 +10,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.auth.router import router as auth_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.health.router import router as health_router
 from app.meta.router import router as meta_router
+from app.posts.router import router as posts_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -32,6 +34,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             pool_pre_ping=True,
             connect_args={"timeout": 5},  # fail fast when the database is unreachable
         )
+        # expire_on_commit=False: objects stay readable after commit without a
+        # surprise reload (which async SQLAlchemy could not do implicitly).
+        app.state.sessionmaker = async_sessionmaker(app.state.engine, expire_on_commit=False)
         app.state.redis = Redis.from_url(
             str(settings.redis_url),
             socket_timeout=settings.readiness_timeout_seconds,
@@ -68,4 +73,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(meta_router)
+    app.include_router(auth_router)
+    app.include_router(posts_router)
     return app

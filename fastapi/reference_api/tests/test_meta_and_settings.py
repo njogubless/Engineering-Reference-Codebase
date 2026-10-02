@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from app.core.config import Settings
 
 REQUIRED = {
+    "secret_key": "x" * 32,
     "database_url": "postgresql://u:p@localhost:5433/db",
     "redis_url": "redis://localhost:6380/0",
 }
@@ -36,6 +37,11 @@ def test_valid_production_settings():
         ({"environment": "prod", **REQUIRED}, "environment"),
         ({"environment": "production", "debug": True, **REQUIRED}, "DEBUG must be off"),
         ({"environment": "test", "readiness_timeout_seconds": 0, **REQUIRED}, "greater than 0"),
+        ({"environment": "test", **{**REQUIRED, "secret_key": "short"}}, "at least 32 characters"),
+        (
+            {"environment": "production", "argon2_time_cost": 1, **REQUIRED},
+            "may not be lowered",
+        ),
         (
             {"environment": "production", "cors_allowed_origins": "*", **REQUIRED},
             "explicit origins",

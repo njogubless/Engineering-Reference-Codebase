@@ -5,7 +5,8 @@
 #   make up            start Postgres, Redis, Mailpit (Docker)
 #   make check         full quality gate: format, lint, types, tests, build
 #   make check-<stack> one stack: django | fastapi | react | flutter | contract
-#   make run-<stack>   run one app locally
+#   make run-<stack>   run one app locally (migrates first)
+#   make seed          demo users, posts and comments in both backends
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -21,7 +22,7 @@ CONTRACT_DIR:= tests/contract
 
 DJANGO_ENV  := DJANGO_ENV_FILE=.env.test
 
-.PHONY: help setup up down check check-django check-fastapi check-react check-flutter check-contract \
+.PHONY: help setup up down seed fuzz-contract check check-django check-fastapi check-react check-flutter check-contract \
         run-django run-fastapi run-react run-flutter
 
 help:
@@ -70,10 +71,16 @@ check-django:
 	cd $(DJANGO_DIR) && $(DJANGO_ENV) .venv/bin/python manage.py makemigrations --check --dry-run
 	cd $(DJANGO_DIR) && .venv/bin/pytest -q
 
+FASTAPI_ENV := FASTAPI_ENV_FILE=.env.test
+
 check-fastapi:
 	cd $(FASTAPI_DIR) && .venv/bin/ruff format --check .
 	cd $(FASTAPI_DIR) && .venv/bin/ruff check .
 	cd $(FASTAPI_DIR) && .venv/bin/mypy .
+	@# Migrations apply cleanly, and the models match them (no forgotten migration).
+	cd $(FASTAPI_DIR) && $(FASTAPI_ENV) .venv/bin/python -m scripts.ensure_database
+	cd $(FASTAPI_DIR) && $(FASTAPI_ENV) .venv/bin/alembic upgrade head
+	cd $(FASTAPI_DIR) && $(FASTAPI_ENV) .venv/bin/alembic check
 	cd $(FASTAPI_DIR) && .venv/bin/pytest -q
 
 check-react:
@@ -94,12 +101,25 @@ check-flutter:
 check-contract:
 	scripts/contract-check.sh
 
+# Exploratory: fresh random inputs and more examples. Findings become
+# regression tests; this target is not part of `make check`.
+fuzz-contract:
+	CONTRACT_FUZZ=1 scripts/contract-check.sh
+
+# --- Demo data ----------------------------------------------------------------
+
+seed:
+	cd $(DJANGO_DIR) && .venv/bin/python manage.py seed_demo
+	cd $(FASTAPI_DIR) && .venv/bin/python -m scripts.seed_demo
+
 # --- Run --------------------------------------------------------------------
 
 run-django:
+	cd $(DJANGO_DIR) && .venv/bin/python manage.py migrate
 	cd $(DJANGO_DIR) && .venv/bin/python manage.py runserver 8410
 
 run-fastapi:
+	cd $(FASTAPI_DIR) && .venv/bin/python -m scripts.ensure_database && .venv/bin/alembic upgrade head
 	cd $(FASTAPI_DIR) && .venv/bin/uvicorn app.main:create_app --factory --port 8420 --reload
 
 run-react:
