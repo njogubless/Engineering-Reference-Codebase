@@ -1,0 +1,30 @@
+# Weekly dependency updates for every ecosystem in the repository.
+# Grouped minor/patch updates keep the PR volume manageable; majors arrive
+# individually because they usually need code changes.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directories: ["/django/reference_api", "/fastapi/reference_api", "/tests/contract"]
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+
+  - package-ecosystem: npm
+    directory: /react/reference_app
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+
+  - package-ecosystem: pub
+    directory: /flutter/reference_app
+    schedule: { interval: weekly }
+    groups:
+      minor-and-patch: { update-types: [minor, patch] }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /infrastructure/docker
+    schedule: { interval: weekly }

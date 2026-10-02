@@ -1,0 +1,36 @@
+# Tool configuration only. Dependencies are pinned with pip-tools:
+# requirements.in -> requirements.txt (hashed), requirements-dev.in -> requirements-dev.txt.
+[project]
+name = "fastapi-reference-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "ASYNC", "FAST", "SIM", "RET", "PTH", "T20", "BLE", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+"app/health/router.py" = ["BLE001"]  # readiness probe catches broadly on purpose
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["\\.venv/"]
+
+[[tool.mypy.overrides]]
+# Tests are type-checked, but fixtures and helpers need not be fully annotated.
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_return_any = false
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers -p no:cacheprovider"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]

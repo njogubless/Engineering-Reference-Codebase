@@ -1,0 +1,29 @@
+name: Flutter
+
+on:
+  push:
+    branches: [main]
+    paths: ["flutter/**", "Makefile", ".github/workflows/flutter.yml"]
+  pull_request:
+    paths: ["flutter/**", "Makefile", ".github/workflows/flutter.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.4"
+          channel: stable
+          cache: true
+      - run: make setup-flutter
+      - run: make check-flutter

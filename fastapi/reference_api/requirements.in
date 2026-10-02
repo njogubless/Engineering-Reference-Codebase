@@ -1,0 +1,10 @@
+# Runtime dependencies. Each one is justified in docs/implementation-roadmap.md
+# (Dependency strategy → FastAPI). Add new entries only together with that table.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6     # typed, env-driven, fail-fast settings
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30
+alembic>=1.14
+redis>=5.2                 # readiness probe now; caching, rate limiting, pub/sub later
