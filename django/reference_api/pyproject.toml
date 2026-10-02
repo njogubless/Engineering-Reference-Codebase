@@ -1,0 +1,52 @@
+# Tool configuration only. Dependencies are pinned with pip-tools:
+# requirements.in -> requirements.txt (hashed), requirements-dev.in -> requirements-dev.txt.
+[project]
+name = "django-reference-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F",   # pycodestyle, pyflakes
+  "I",             # import order
+  "B",             # bugbear: likely bugs
+  "UP",            # modern syntax
+  "S",             # bandit: security
+  "DJ",            # Django-specific
+  "SIM", "RET", "PTH", "T20", "BLE", "RUF",
+]
+ignore = ["RUF012"]  # Django/DRF class attributes are idiomatically mutable
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]  # assert and fake secrets are fine in tests
+"apps/core/views.py" = ["BLE001"]           # readiness probe catches broadly on purpose
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = ["environ.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests are type-checked, but fixtures and helpers need not be fully annotated.
+module = ["apps.*.tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_return_any = false
+
+[tool.django-stubs]
+django_settings_module = "config.test_settings"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.test_settings"
+addopts = "--strict-markers -p no:cacheprovider"
+filterwarnings = ["error"]

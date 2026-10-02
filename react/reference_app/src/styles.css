@@ -1,0 +1,21 @@
+:root {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 48rem;
+  padding: 1rem;
+}
+
+.error-alert {
+  border: 1px solid #b42318;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.error-alert__reference {
+  font-size: 0.875rem;
+}

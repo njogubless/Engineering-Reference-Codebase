@@ -1,0 +1,35 @@
+# Secrets and local configuration — never commit
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.test
+!.env.development
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Flutter / Dart (per-project ignores live in flutter/reference_app/.gitignore)
+.dart_tool/
+build/
+
+# Editors / OS
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store

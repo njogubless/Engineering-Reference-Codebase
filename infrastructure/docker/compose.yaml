@@ -1,0 +1,43 @@
+# Local development services. Each service exists because a pattern needs it
+# (see docs/architecture.md §7). Host ports are offset from the defaults so the
+# stack can run next to other projects on the same machine.
+name: reference
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: reference
+      POSTGRES_PASSWORD: reference
+      POSTGRES_DB: reference
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Creates one database per backend (and their test databases).
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reference -d reference"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    # Catches all outgoing email in development (web UI on :8025).
+    image: axllent/mailpit:v1.20
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+volumes:
+  postgres-data:

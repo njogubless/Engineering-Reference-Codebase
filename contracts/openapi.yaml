@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Reference API
+  version: 1.0.0
+  summary: Shared HTTP contract implemented by both reference backends.
+  description: |
+    Design-first contract (see docs/architecture.md §4). Both
+    `django/reference_api` and `fastapi/reference_api` implement it, and
+    `tests/contract` verifies each running backend against it.
+
+    Conventions:
+    - Errors use RFC 9457 Problem Details (`application/problem+json`).
+    - Every response carries `X-Request-ID`; send one to correlate client logs.
+    - Timestamps are RFC 3339 in UTC. Money is integer minor units + ISO-4217.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8410
+    description: Django (local)
+  - url: http://localhost:8420
+    description: FastAPI (local)
+tags:
+  - name: health
+    description: Liveness and readiness probes (unversioned, unauthenticated).
+  - name: meta
+    description: Public, non-secret runtime configuration for clients.
+
+paths:
+  /health/live:
+    get:
+      tags: [health]
+      operationId: getLiveness
+      summary: Process is running.
+      description: Never checks dependencies — a failing database must not restart healthy processes.
+      security: []
+      responses:
+        "200":
+          description: Alive.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Liveness" }
+
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: getReadiness
+      summary: Process can serve traffic (dependencies reachable).
+      description: |
+        Checks hard dependencies (database, Redis), each with a timeout.
+        503 means "stop routing traffic here", not "restart me". The body never
+        contains error details because the endpoint is public.
+      security: []
+      responses:
+        "200":
+          description: Ready.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+        "503":
+          description: At least one dependency check failed.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+
+  /api/v1/meta:
+    get:
+      tags: [meta]
+      operationId: getMeta
+      summary: Public runtime configuration (API version, feature flags).
+      description: |
+        Lets clients adapt without a rebuild. Only flags declared public are
+        listed; server-only flags never appear.
+      security: []
+      responses:
+        "200":
+          description: Client-visible configuration.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Meta" }
+        default: { $ref: "#/components/responses/Problem" }
+
+components:
+  headers:
+    RequestId:
+      description: Correlation ID. Echoes a valid incoming `X-Request-ID`, otherwise generated.
+      schema: { type: string, pattern: "^[A-Za-z0-9._-]{1,128}$" }
+
+  responses:
+    Problem:
+      description: Any error, as RFC 9457 Problem Details.
+      headers:
+        X-Request-ID: { $ref: "#/components/headers/RequestId" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    ErrorCode:
+      type: string
+      description: Stable, machine-readable error code. Clients switch on this, never on `title`/`detail`.
+      enum:
+        - bad_request
+        - validation_error
+        - authentication_error
+        - authorization_error
+        - not_found
+        - method_not_allowed
+        - not_acceptable
+        - conflict
+        - idempotency_key_reused
+        - unsupported_media_type
+        - rate_limited
+        - internal_error
+        - external_service_error
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code, message]
+      properties:
+        field:
+          type: [string, "null"]
+          description: Dotted path to the field (`items.0.name`); null for errors not tied to one field.
+        code: { type: string, description: "Validator code, e.g. `required`, `max_length`, `invalid`." }
+        message: { type: string }
+
+    Problem:
+      type: object
+      required: [type, title, status, code, request_id]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        code: { $ref: "#/components/schemas/ErrorCode" }
+        detail: { type: string }
+        instance: { type: string }
+        request_id: { type: string }
+        errors:
+          type: array
+          items: { $ref: "#/components/schemas/FieldError" }
+        retry_after:
+          type: integer
+          minimum: 0
+          description: Seconds until retrying is useful (only for `rate_limited`).
+
+    Liveness:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        checks:
+          type: object
+          description: One entry per dependency; values never include error details.
+          additionalProperties: { type: string, enum: [ok, fail] }
+
+    Meta:
+      type: object
+      required: [api_version, environment, features]
+      properties:
+        api_version: { type: string, const: "1" }
+        environment: { type: string, enum: [development, test, staging, production] }
+        features:
+          type: object
+          description: Public feature flags. Server-only flags are never listed here.
+          additionalProperties: { type: boolean }

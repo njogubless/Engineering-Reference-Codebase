@@ -1,0 +1,35 @@
+name: React
+
+on:
+  push:
+    branches: [main]
+    paths: ["react/**", "contracts/**", "Makefile", ".github/workflows/react.yml"]
+  pull_request:
+    paths: ["react/**", "contracts/**", "Makefile", ".github/workflows/react.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: react/reference_app/package.json
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: react/reference_app/pnpm-lock.yaml
+      - run: make setup-react
+      - run: make check-react
+      - name: Audit dependencies for known vulnerabilities
+        run: cd react/reference_app && pnpm audit --prod --audit-level high

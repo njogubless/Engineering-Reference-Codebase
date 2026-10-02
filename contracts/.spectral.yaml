@@ -1,0 +1,9 @@
+# Lint rules for the HTTP contract (run by scripts/contract-check.sh).
+extends: ["spectral:oas"]
+rules:
+  # Every operation needs a stable operationId: clients and codegen depend on it.
+  operation-operationId: error
+  operation-tags: error
+  # Servers are local development URLs on purpose.
+  oas3-api-servers: off
+  info-contact: off

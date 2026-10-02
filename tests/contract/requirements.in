@@ -1,0 +1,6 @@
+# Cross-stack contract tests (see README.md).
+schemathesis>=4.0   # property-based conformance testing against contracts/openapi.yaml
+pytest>=8
+httpx>=0.28         # fetches each backend's generated OpenAPI document
+pyyaml>=6
+jsonschema-rs>=0.58  # validates Problem bodies against the contract schema

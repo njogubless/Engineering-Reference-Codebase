@@ -1,0 +1,9 @@
+# Runtime dependencies. Each one is justified in docs/implementation-roadmap.md
+# (Dependency strategy → Django). Add new entries only together with that table.
+django>=5.2,<5.3          # LTS
+djangorestframework>=3.16
+psycopg[binary]>=3.2
+django-environ>=0.12      # env-driven, fail-fast settings
+drf-spectacular>=0.28     # OpenAPI generation, checked against contracts/openapi.yaml
+redis>=5.2                # Redis cache backend + readiness probe
+django-cors-headers>=4.6  # CORS for browser clients on other origins (React, Flutter web)
