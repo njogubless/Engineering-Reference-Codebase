@@ -20,8 +20,13 @@ class User(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
-    email: Mapped[str] = mapped_column(String(254), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    # Nullable: phone sign-in accounts have no email (unique allows many NULLs).
+    email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    email_verified: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
+    # None means "no password" (Firebase-only accounts).
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    # Only ever taken from a verified Firebase ID token.
+    firebase_uid: Mapped[str | None] = mapped_column(String(128), unique=True)
     display_name: Mapped[str] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(default=True)
     date_joined: Mapped[datetime] = mapped_column(default=utcnow)

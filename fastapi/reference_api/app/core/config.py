@@ -53,6 +53,22 @@ class Settings(BaseSettings):
 
     readiness_timeout_seconds: float = Field(default=2.0, gt=0)
 
+    # Firebase: verifying ID tokens needs only the project id. The emulator
+    # host makes firebase-admin accept unsigned emulator tokens.
+    firebase_project_id: str
+    firebase_auth_emulator_host: str = ""
+
+    # Email (Mailpit in development) and where links in emails point.
+    email_host: str = "localhost"
+    email_port: int = 1025
+    email_username: str = ""
+    email_password: str = ""
+    email_use_tls: bool = False
+    default_from_email: str = "Reference <no-reply@reference.test>"
+    frontend_base_url: str
+    password_reset_ttl_seconds: int = Field(default=60 * 60, gt=0)
+    email_verification_ttl_seconds: int = Field(default=3 * 24 * 60 * 60, gt=0)
+
     # Browser origins allowed to call the API (comma-separated, same format as Django).
     cors_allowed_origins: Annotated[list[str], NoDecode] = []
 
@@ -73,6 +89,14 @@ class Settings(BaseSettings):
                 or self.argon2_memory_cost_kib < ARGON2_MEMORY_COST_KIB
             ):
                 raise ValueError("Argon2 cost may not be lowered in staging/production.")
+            if self.firebase_auth_emulator_host:
+                raise ValueError(
+                    "FIREBASE_AUTH_EMULATOR_HOST must not be set in staging/production."
+                )
+            if self.firebase_project_id.startswith("demo-"):
+                raise ValueError("FIREBASE_PROJECT_ID is an emulator-only demo project.")
+            if not self.frontend_base_url.startswith("https://"):
+                raise ValueError("FRONTEND_BASE_URL must use https in staging/production.")
             if "*" in self.cors_allowed_origins:
                 raise ValueError(
                     "CORS_ALLOWED_ORIGINS must list explicit origins in staging/production."

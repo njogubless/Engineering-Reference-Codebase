@@ -11,3 +11,4 @@ redis>=5.2                 # readiness probe now; caching, rate limiting, pub/su
 pyjwt>=2.10               # access tokens (FastAPI shows token mechanics by hand; Django uses simplejwt)
 argon2-cffi>=23.1          # Argon2id password hashing
 email-validator>=2.2       # pydantic EmailStr
+firebase-admin>=6.6        # verifies Firebase ID tokens (and sends FCM in Phase 12)

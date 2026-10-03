@@ -43,6 +43,7 @@ def hash_password(password: str, settings: Settings) -> str:
 
 
 def verify_password(password: str, password_hash: str | None, settings: Settings) -> bool:
+    """False for accounts without a password (Firebase-only), in the same time."""
     hasher, dummy = _for(settings)
     try:
         # Hashes record their own parameters, so older hashes still verify.
@@ -124,3 +125,42 @@ def hash_refresh_secret(token: str) -> str:
     # A fast hash is right here (unlike passwords): the token is 384 random
     # bits, so it cannot be brute-forced; the hash only protects a DB leak.
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# --- Single-use email-link tokens -----------------------------------------------
+# Same idea as Django's PasswordResetTokenGenerator, built on the JWT
+# primitives above: the token is signed, expires, is bound to a purpose, and
+# carries a fingerprint of the user state it applies to. Changing that state
+# (the password, or the verified email) invalidates the token: single use
+# without storing anything.
+
+
+def state_fingerprint(*parts: object) -> str:
+    return hashlib.sha256("|".join(str(part) for part in parts).encode()).hexdigest()[:32]
+
+
+def create_link_token(
+    *, purpose: str, user_id: UUID, fingerprint: str, ttl_seconds: int, settings: Settings
+) -> str:
+    now = datetime.now(UTC)
+    claims = {
+        "sub": str(user_id),
+        "purpose": purpose,  # a reset token can never be used to verify an email, or log in
+        "fp": fingerprint,
+        "iat": now,
+        "exp": now + timedelta(seconds=ttl_seconds),
+    }
+    return jwt.encode(claims, settings.secret_key, algorithm=ALGORITHM)
+
+
+def read_link_token(token: str, *, purpose: str, settings: Settings) -> tuple[UUID, str] | None:
+    """(user id, fingerprint) if the token is genuine, unexpired and for `purpose`."""
+    try:
+        claims = jwt.decode(
+            token, settings.secret_key, algorithms=[ALGORITHM], options={"require": ["exp", "sub"]}
+        )
+        if claims.get("purpose") != purpose:
+            return None
+        return UUID(claims["sub"]), str(claims["fp"])
+    except (jwt.InvalidTokenError, ValueError, KeyError):
+        return None

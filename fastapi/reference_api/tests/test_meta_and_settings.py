@@ -6,6 +6,8 @@ from app.core.config import Settings
 
 REQUIRED = {
     "secret_key": "x" * 32,
+    "firebase_project_id": "reference-prod",
+    "frontend_base_url": "https://app.example.com",
     "database_url": "postgresql://u:p@localhost:5433/db",
     "redis_url": "redis://localhost:6380/0",
 }
@@ -17,6 +19,14 @@ def test_meta_exposes_only_public_flags(client: TestClient):
         "environment": "test",
         "features": {"maintenance_banner": True},
     }
+
+
+@pytest.fixture(autouse=True)
+def isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Real environment variables win over arguments. The app's lifespan
+    exports FIREBASE_AUTH_EMULATOR_HOST (firebase-admin reads only the process
+    environment), so tests that build deployed settings must not inherit it."""
+    monkeypatch.delenv("FIREBASE_AUTH_EMULATOR_HOST", raising=False)
 
 
 def make_settings(**values: object) -> Settings:
@@ -38,6 +48,25 @@ def test_valid_production_settings():
         ({"environment": "production", "debug": True, **REQUIRED}, "DEBUG must be off"),
         ({"environment": "test", "readiness_timeout_seconds": 0, **REQUIRED}, "greater than 0"),
         ({"environment": "test", **{**REQUIRED, "secret_key": "short"}}, "at least 32 characters"),
+        (
+            {
+                "environment": "production",
+                "firebase_auth_emulator_host": "127.0.0.1:9099",
+                **REQUIRED,
+            },
+            "must not be set",
+        ),
+        (
+            {"environment": "production", **{**REQUIRED, "firebase_project_id": "demo-x"}},
+            "emulator-only",
+        ),
+        (
+            {
+                "environment": "production",
+                **{**REQUIRED, "frontend_base_url": "http://app.example.com"},
+            },
+            "must use https",
+        ),
         (
             {"environment": "production", "argon2_time_cost": 1, **REQUIRED},
             "may not be lowered",

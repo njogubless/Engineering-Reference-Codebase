@@ -24,7 +24,7 @@ plugins = ["pydantic.mypy"]
 exclude = ["\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["asyncpg.*"]  # no type information published
+module = ["asyncpg.*", "firebase_admin.*"]  # no type information published
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -32,10 +32,14 @@ ignore_missing_imports = true
 module = ["tests.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_calls = false
 warn_return_any = false
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers -p no:cacheprovider"
+# `firebase` tests need the Auth emulator: `make check-firebase` runs them
+# inside `firebase emulators:exec`.
+addopts = "--strict-markers -p no:cacheprovider -m 'not firebase'"
+markers = ["firebase: needs the Firebase Auth emulator (make check-firebase)"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]

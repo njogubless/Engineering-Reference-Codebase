@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.core.config import Settings  # noqa: E402
+from app.core.email import OutboxEmailSender, get_email_sender  # noqa: E402
 from app.main import create_app  # noqa: E402
 from scripts.ensure_database import ensure_database  # noqa: E402
 
@@ -42,6 +43,14 @@ def settings() -> Settings:
 @pytest.fixture
 def app(settings: Settings) -> FastAPI:
     return create_app(settings)
+
+
+@pytest.fixture
+def outbox(app: FastAPI) -> OutboxEmailSender:
+    """Captures emails instead of sending them (dependency override)."""
+    sender = OutboxEmailSender()
+    app.dependency_overrides[get_email_sender] = lambda: sender
+    return sender
 
 
 @pytest.fixture

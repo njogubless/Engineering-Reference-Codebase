@@ -4,6 +4,7 @@
 fresh app per test, and nothing connects to anything at import time.
 """
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.auth.router import router as auth_router
 from app.core.config import Settings, get_settings
+from app.core.email import SmtpEmailSender
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
@@ -37,6 +39,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # expire_on_commit=False: objects stay readable after commit without a
         # surprise reload (which async SQLAlchemy could not do implicitly).
         app.state.sessionmaker = async_sessionmaker(app.state.engine, expire_on_commit=False)
+        # firebase-admin reads the emulator host from the process environment only.
+        if settings.firebase_auth_emulator_host:
+            os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = settings.firebase_auth_emulator_host
+        app.state.email_sender = SmtpEmailSender(settings)
         app.state.redis = Redis.from_url(
             str(settings.redis_url),
             socket_timeout=settings.readiness_timeout_seconds,

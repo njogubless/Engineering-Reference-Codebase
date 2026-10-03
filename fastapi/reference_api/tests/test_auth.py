@@ -32,7 +32,13 @@ class TestRegister:
         )
         assert response.status_code == 201
         assert response.json()["email"] == "ada@example.com"
-        assert set(response.json()) == {"id", "email", "display_name", "date_joined"}
+        assert set(response.json()) == {
+            "id",
+            "email",
+            "email_verified",
+            "display_name",
+            "date_joined",
+        }
 
     async def test_duplicate_email_any_case_is_a_field_error(self, api, ada):
         response = await api.post(
