@@ -15,12 +15,17 @@ select = ["E", "W", "F", "I", "B", "UP", "S", "ASYNC", "FAST", "SIM", "RET", "PT
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]
 "app/health/router.py" = ["BLE001"]  # readiness probe catches broadly on purpose
+"migrations/versions/**" = ["E501"]  # generated SQL literals
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg.*"]  # no type information published
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Tests are type-checked, but fixtures and helpers need not be fully annotated.

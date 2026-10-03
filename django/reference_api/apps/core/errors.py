@@ -219,7 +219,7 @@ def _api_exception_response(exc: exceptions.APIException, instance: str | None) 
         errors = flatten_validation_errors(exc.detail)
         detail = "One or more fields are invalid."
     else:
-        detail = str(exc.detail)
+        detail = _detail_text(exc.detail)
 
     # `wait` is set by DRF at runtime but missing from its type stubs.
     wait: float | None = getattr(exc, "wait", None)
@@ -242,6 +242,15 @@ def _api_exception_response(exc: exceptions.APIException, instance: str | None) 
         **extensions,
     )
     return Response(body, status=status_code, headers=headers, content_type=PROBLEM_CONTENT_TYPE)
+
+
+def _detail_text(detail: Any) -> str:
+    """Some libraries (simplejwt) put a dict or list in `detail`; extract the message."""
+    if isinstance(detail, dict):
+        return str(detail.get("detail", "")) or "Request failed."
+    if isinstance(detail, list):
+        return str(detail[0]) if detail else "Request failed."
+    return str(detail)
 
 
 # --- Django-level handlers --------------------------------------------------

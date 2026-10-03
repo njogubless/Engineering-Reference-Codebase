@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-> Status: **Phase 1 complete** (2026-10-02). Phase 2 is next.
+> Status: **Phase 2 complete** (2026-10-03). Phase 3 (client authentication, Firebase) is next.
 > Status per pattern is tracked only in [cross-stack-matrix.md](cross-stack-matrix.md).
 
 ## Definition of Done
@@ -154,11 +154,51 @@ Deviations from the plan, each documented where it matters:
 - The Flutter home screen is the diagnostics demo. The pattern-catalogue navigation shell arrives with routing (Phase 4).
 - Firebase is not used yet; it arrives with data access (Phase 2) and authentication (Phase 3).
 
-### Phase 2 in detail (next)
+### Phase 2a: delivered (backends + contract)
 
-1. **Models:** `User` (custom user model, decided before the first migration), `Post`, `Comment` in both backends with constraints, indexes and migrations (Django migrations, Alembic). UUIDv7 public IDs.
-2. **Contract:** CRUD for posts/comments, `CursorPage`, request/response DTOs; regenerate React types.
-3. **Backends:** Django selectors/services/serializers/views; FastAPI routers/schemas/services with an async session dependency. Contract tests extended.
-4. **React:** feature `posts` with TanStack Query (query keys, invalidation, optimistic update + rollback), async UI states.
-5. **Flutter:** Firebase emulator setup; Firestore data source (CRUD, streams, queries, transactions, batched writes, subcollections) and a REST data source behind the same repository; Riverpod provider guide with a documented reason for each provider type.
-6. **Time:** UTC on the wire, local time in UIs, tested across a DST boundary.
+Reordered by [ADR 0007](adr/0007-backend-identity-before-crud.md): backend
+identity ships with the data layer. Verified 2026-10-02 by `make check`
+(Django 117 tests, FastAPI 88, contract 48).
+
+- Custom user model (email login, UUIDv7), registration, login, rotating refresh
+  tokens, idempotent logout, `/me`: simplejwt in Django, hand-written in FastAPI
+  (hashed refresh tokens, family revocation on reuse, `FOR UPDATE` on rotation,
+  timing-equalised login).
+- Posts and comments CRUD with author-only writes, 404-vs-403 visibility,
+  DB constraints, partial and composite indexes, cursor pagination
+  (DRF `CursorPagination` vs hand-written keyset), one query per page.
+- Alembic (async) with `alembic check` in the gate; migrations tested by the suite.
+- Seed commands for demo data in both backends (`make seed`).
+- Contract: auth and posts operations; authenticated Schemathesis on both backends.
+  Its findings and fixes are listed in [36-api-contracts](patterns/36-api-contracts/README.md#what-the-contract-tests-found).
+
+### Phase 2b: delivered (clients on real data)
+
+- **React:** React Router (basic routes), minimal session (in-memory tokens,
+  sign-in returning to the guarded page, sign-out that revokes and clears the
+  cache, 401 ends the session); posts with a query-key factory, cursor
+  `useInfiniteQuery`, optimistic publish and delete with rollback (tests
+  mutation-checked), server field errors next to fields, local-time display
+  with a DST test. Verified against the seeded Django API in a browser.
+- **Flutter:** auth interceptor reading the session at request time; session
+  `Notifier`; `PostsRepository` interface with REST and Firestore
+  implementations; `AsyncNotifier` infinite list (concurrent load-more guard,
+  dedupe, load-more errors kept separate, pull-to-refresh, optimistic publish
+  with rollback); Firestore: denormalised authors, transactional comment
+  counts, batched publishing, cascading delete by hand, `startAfterDocument`
+  cursors, streams, server timestamps. Verified with `fake_cloud_firestore` (🧪).
+- **Docs:** 06-state-management (with the Riverpod provider guide), 08-data-access, 41-money-time.
+
+### Phase 3 (next): client authentication and Firebase
+
+1. **Firebase emulators** (`firebase/`): Auth + Firestore with security rules
+   that require `request.auth`; the Flutter Firestore repository runs against
+   them (🧪 → ✅).
+2. **Flutter:** Firebase Auth email (register, verify, reset, change password,
+   delete account), Google, phone OTP; the auth state machine
+   (`Authenticated | Unauthenticated | EmailVerificationRequired | PhoneVerification | ...`);
+   session restoration; `flutter_secure_storage` for first-party tokens.
+3. **Backends:** Firebase ID-token verification mapped to local users (never trusting a client-sent uid); password reset and email verification via Mailpit.
+4. **React:** the refresh architecture (access token in memory, refresh token
+   in an httpOnly cookie or memory, decided in an ADR), single-flight refresh
+   on 401, session restoration; a Firebase auth adapter behind the same interface.

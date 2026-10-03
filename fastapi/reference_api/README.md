@@ -16,6 +16,11 @@ make -C ../.. check-fastapi     # format, lint, mypy --strict, tests
 | `app/core/errors.py` | Problem Details via per-type exception handlers; Pydantic → Django-compatible codes |
 | `app/core/middleware.py` | pure-ASGI request context, unexpected-error handling, request logging |
 | `app/health/router.py` | concurrent readiness checks with timeouts |
+| `app/auth/` | hand-written JWT access tokens, hashed rotating refresh tokens with reuse detection, Argon2id, `CurrentUser` dependency |
+| `app/posts/` | async SQLAlchemy CRUD, `lazy="raise"` relationships, keyset pagination |
+| `app/core/types.py` | `SafeChars`, and why Pydantic metadata order matters |
+| `migrations/` | Alembic (async); `alembic check` in the gate |
+| `scripts/` | `ensure_database`, `seed_demo` |
 
 Compare with the Django API: same contract, same error codes, different
 mechanics. See [docs/patterns/30-error-handling](../../docs/patterns/30-error-handling/README.md).

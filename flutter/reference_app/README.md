@@ -15,6 +15,8 @@ make -C ../.. check-flutter     # format, analyze, test, web build
 | `lib/core/config/` | validated `--dart-define` configuration ([config/README.md](config/README.md)) |
 | `lib/core/errors/` | sealed `AppError` hierarchy, exhaustive `userMessage` |
 | `lib/core/networking/` | Dio client: request ID, logging, idempotent-only retry with jitter, error mapping |
+| `lib/features/auth/` | session `Notifier`, auth interceptor, sign-in screen |
+| `lib/features/posts/` | repository interface with REST and Firestore implementations, `AsyncNotifier` infinite list, optimistic publish |
 | `lib/features/diagnostics/` | Phase 1 demo: data → application (FutureProvider.autoDispose + cancel on dispose) → presentation |
 
 Layout: feature-first with layers inside each feature ([ADR 0004](../../docs/adr/0004-feature-first-flutter-layout.md)).

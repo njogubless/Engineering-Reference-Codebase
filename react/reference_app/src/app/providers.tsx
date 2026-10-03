@@ -1,12 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
+import { AuthProvider } from '../features/auth/AuthProvider';
+import { createSessionStore, type SessionStore } from '../features/auth/session';
 import type { AppConfig } from '../lib/config';
-import { createHttpClient, type HttpClient } from '../lib/http';
+import { createHttpClient, type HttpClient, type HttpClientConfig } from '../lib/http';
 
 interface Services {
   config: AppConfig;
   http: HttpClient;
+  session: SessionStore;
 }
 
 const ServicesContext = createContext<Services | null>(null);
@@ -18,17 +21,32 @@ const ServicesContext = createContext<Services | null>(null);
  */
 export function AppProviders({
   config,
-  http,
+  httpOptions,
+  session,
   children,
 }: {
   config: AppConfig;
-  http?: HttpClient;
+  /** Test hooks (fake timers/random); production uses the defaults. */
+  httpOptions?: Partial<HttpClientConfig>;
+  session?: SessionStore;
   children: ReactNode;
 }) {
-  const [services] = useState<Services>(() => ({
-    config,
-    http: http ?? createHttpClient({ baseUrl: config.apiBaseUrl }),
-  }));
+  const [services] = useState<Services>(() => {
+    const store = session ?? createSessionStore();
+    return {
+      config,
+      session: store,
+      http: createHttpClient({
+        baseUrl: config.apiBaseUrl,
+        getAccessToken: () => store.get()?.access ?? null,
+        // An expired or revoked access token ends the session (Phase 3: refresh instead).
+        onUnauthorized: () => {
+          store.set(null);
+        },
+        ...httpOptions,
+      }),
+    };
+  });
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -44,7 +62,9 @@ export function AppProviders({
 
   return (
     <ServicesContext.Provider value={services}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>{children}</AuthProvider>
+      </QueryClientProvider>
     </ServicesContext.Provider>
   );
 }

@@ -18,6 +18,9 @@ Environment = Literal["development", "test", "staging", "production"]
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 
+ARGON2_TIME_COST = 3
+ARGON2_MEMORY_COST_KIB = 64 * 1024
+
 
 class Settings(BaseSettings):
     # A local .env file is a development convenience; real environment
@@ -30,6 +33,15 @@ class Settings(BaseSettings):
 
     environment: Environment
     debug: bool = False
+    # Signs access tokens (HMAC-SHA256): at least 32 bytes, in every environment.
+    secret_key: str = Field(min_length=32)
+    access_token_ttl_seconds: int = Field(default=15 * 60, gt=0)
+    # Argon2id cost. Defaults are argon2-cffi's recommendation; tests lower
+    # them for speed (like Django's test-only MD5 hasher). Deployed
+    # environments may raise but never lower them (validated below).
+    argon2_time_cost: int = Field(default=ARGON2_TIME_COST, ge=1)
+    argon2_memory_cost_kib: int = Field(default=ARGON2_MEMORY_COST_KIB, ge=8)
+    refresh_token_ttl_days: int = Field(default=7, gt=0)
     database_url: PostgresDsn
     redis_url: RedisDsn
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -56,6 +68,11 @@ class Settings(BaseSettings):
         if self.environment in ("staging", "production"):
             if self.debug:
                 raise ValueError("DEBUG must be off in staging/production.")
+            if (
+                self.argon2_time_cost < ARGON2_TIME_COST
+                or self.argon2_memory_cost_kib < ARGON2_MEMORY_COST_KIB
+            ):
+                raise ValueError("Argon2 cost may not be lowered in staging/production.")
             if "*" in self.cors_allowed_origins:
                 raise ValueError(
                     "CORS_ALLOWED_ORIGINS must list explicit origins in staging/production."

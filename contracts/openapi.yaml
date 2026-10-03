@@ -12,9 +12,22 @@ info:
     - Errors use RFC 9457 Problem Details (`application/problem+json`).
     - Every response carries `X-Request-ID`; send one to correlate client logs.
     - Timestamps are RFC 3339 in UTC. Money is integer minor units + ISO-4217.
+    - Strings must not contain NUL (U+0000) or unpaired surrogates; both are
+      rejected with 422 (`null_characters_not_allowed`,
+      `surrogate_characters_not_allowed`) because PostgreSQL cannot store them.
+    - Unknown body fields are rejected (422 `unknown_field`); unknown query
+      parameters are ignored.
+    - Text fields that must not be blank are trimmed with Python's definition of
+      whitespace (`str.strip`), which is wider than JSON Schema's `\s` (it
+      includes U+001C-U+001F and U+0085). Their `pattern` (anchor `non_blank`)
+      lists exactly that set, so "schema-valid" and "accepted" agree.
   license:
     name: MIT
     identifier: MIT
+# Every operation requires a bearer token unless it says otherwise
+# (deny by default, like both backends).
+security:
+  - bearerAuth: []
 servers:
   - url: http://localhost:8410
     description: Django (local)
@@ -25,6 +38,10 @@ tags:
     description: Liveness and readiness probes (unversioned, unauthenticated).
   - name: meta
     description: Public, non-secret runtime configuration for clients.
+  - name: auth
+    description: First-party email/password authentication with rotating refresh tokens.
+  - name: posts
+    description: Posts and comments — the CRUD, ownership and pagination demonstration resource.
 
 paths:
   /health/live:
@@ -88,7 +105,286 @@ paths:
               schema: { $ref: "#/components/schemas/Meta" }
         default: { $ref: "#/components/responses/Problem" }
 
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Create an account.
+      description: Returns the new user; sign in with `POST /api/v1/auth/token`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Account created.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/auth/token:
+    post:
+      tags: [auth]
+      operationId: obtainToken
+      summary: Exchange email + password for an access and a refresh token.
+      description: Wrong email and wrong password give the same 401, so the endpoint does not reveal which emails exist.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TokenRequest" }
+      responses:
+        "200":
+          description: Tokens issued.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/auth/token/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      summary: Rotate a refresh token.
+      description: |
+        Returns a new access token and a NEW refresh token. The submitted
+        refresh token stops working (rotation), so a stolen token has a short
+        useful life.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: Tokens rotated.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Revoke a refresh token.
+      description: Access tokens are short-lived and expire on their own; logging out revokes the refresh token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "204":
+          description: |
+            Always 204 for a well-formed request: an unknown, expired or
+            already-revoked token has nothing left to revoke, so logout is idempotent.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: The authenticated user.
+      description: Clients call this after sign-in and on startup to restore the session.
+      responses:
+        "200":
+          description: Current user.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/posts:
+    get:
+      tags: [posts]
+      operationId: listPosts
+      summary: Published posts, newest first (cursor pagination).
+      description: Ordered by `created_at` then `id`, so pages are stable even when posts share a timestamp. Drafts never appear here.
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of posts.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [posts]
+      operationId: createPost
+      summary: Create a post owned by the authenticated user.
+      description: The author is always the authenticated user; an author in the body is rejected. `status` defaults to `draft`; publishing sets `published_at`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostCreate" }
+      responses:
+        "201":
+          description: Created.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/posts/{post_id}:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    get:
+      tags: [posts]
+      operationId: getPost
+      summary: A published post, or the requester's own draft.
+      description: Other users' drafts are reported as 404, not 403, so their existence is not revealed.
+      security: [{}, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: The post.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        default: { $ref: "#/components/responses/Problem" }
+    patch:
+      tags: [posts]
+      operationId: updatePost
+      summary: Partially update a post (author only).
+      description: Non-authors get 403 for a post they can see and 404 for a draft they cannot. Publishing sets `published_at`; unpublishing clears it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostUpdate" }
+      responses:
+        "200":
+          description: Updated.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        default: { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [posts]
+      operationId: deletePost
+      summary: Delete a post and its comments (author only).
+      description: Same visibility rules as update. Deleting removes the post's comments.
+      responses:
+        "204":
+          description: Deleted.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/posts/{post_id}/comments:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+    get:
+      tags: [posts]
+      operationId: listComments
+      summary: Comments on a published post, oldest first (cursor pagination).
+      description: Each comment embeds its author, so listing comments costs a fixed number of queries regardless of page size (no N+1).
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of comments.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentPage" }
+        default: { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [posts]
+      operationId: createComment
+      summary: Comment on a published post.
+      description: Drafts cannot be commented on (404 for other users' drafts, 422 for your own).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommentCreate" }
+      responses:
+        "201":
+          description: Created.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+        default: { $ref: "#/components/responses/Problem" }
+
+  /api/v1/posts/{post_id}/comments/{comment_id}:
+    parameters:
+      - $ref: "#/components/parameters/PostId"
+      - name: comment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [posts]
+      operationId: deleteComment
+      summary: Delete a comment (comment author only).
+      description: The comment must belong to the post in the path; a mismatched pair is 404.
+      responses:
+        "204":
+          description: Deleted.
+          headers:
+            X-Request-ID: { $ref: "#/components/headers/RequestId" }
+        default: { $ref: "#/components/responses/Problem" }
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from `POST /api/v1/auth/token`. Expires after 15 minutes.
+
+  parameters:
+    PostId:
+      name: post_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from a previous page's `next_cursor`. Do not construct or parse it.
+      schema: { type: string, maxLength: 512 }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size (default 20). Values outside 1–100 are rejected, not silently clamped.
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
   headers:
     RequestId:
       description: Correlation ID. Echoes a valid incoming `X-Request-ID`, otherwise generated.
@@ -151,6 +447,141 @@ components:
           type: integer
           minimum: 0
           description: Seconds until retrying is useful (only for `rate_limited`).
+
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, email, display_name, date_joined]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string, maxLength: 100 }
+        date_joined: { type: string, format: date-time }
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, display_name]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 10, maxLength: 128, writeOnly: true }
+        display_name: { type: string, minLength: 1, maxLength: 100, pattern: &non_blank '[^\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]' }
+
+    TokenRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, minLength: 1, maxLength: 254, pattern: *non_blank }
+        password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh]
+      properties:
+        refresh: { type: string, minLength: 1, maxLength: 1024, pattern: *non_blank }
+
+    TokenPair:
+      type: object
+      additionalProperties: false
+      required: [access, refresh]
+      properties:
+        access: { type: string, description: "Short-lived JWT for the Authorization header." }
+        refresh: { type: string, description: "Long-lived, single-use token for POST /auth/token/refresh." }
+
+    Author:
+      type: object
+      additionalProperties: false
+      required: [id, display_name]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+
+    PostStatus:
+      type: string
+      enum: [draft, published]
+
+    Post:
+      type: object
+      additionalProperties: false
+      required: [id, title, body, status, author, comment_count, created_at, updated_at, published_at]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, maxLength: 20000 }
+        status: { $ref: "#/components/schemas/PostStatus" }
+        author: { $ref: "#/components/schemas/Author" }
+        comment_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at:
+          type: [string, "null"]
+          format: date-time
+          description: Set when the post is first published; null for drafts.
+
+    PostCreate:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, pattern: *non_blank, description: "Must contain a non-whitespace character; surrounding whitespace is trimmed." }
+        body: { type: string, maxLength: 20000, default: "" }
+        status: { $ref: "#/components/schemas/PostStatus" }
+
+    PostUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, pattern: *non_blank }
+        body: { type: string, maxLength: 20000 }
+        status: { $ref: "#/components/schemas/PostStatus" }
+
+    PostPage:
+      # OpenAPI has no generics. A shared "CursorPage" base narrowed with allOf
+      # generates `unknown[] & Post[]` in TypeScript; explicit page schemas
+      # generate clean types.
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page; null at the end of the list.
+
+    Comment:
+      type: object
+      additionalProperties: false
+      required: [id, post_id, body, author, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        post_id: { type: string, format: uuid }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        author: { $ref: "#/components/schemas/Author" }
+        created_at: { type: string, format: date-time }
+
+    CommentCreate:
+      type: object
+      additionalProperties: false
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 2000, pattern: *non_blank }
+
+    CommentPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Comment" }
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page; null at the end of the list.
 
     Liveness:
       type: object

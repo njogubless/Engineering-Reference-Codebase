@@ -1,0 +1,23 @@
+# Schemathesis configuration for tests/contract (auto-discovered).
+
+[generation]
+# The quality gate must be reproducible: the same commit gives the same
+# result. Exploratory fuzzing with fresh random inputs runs separately
+# (`make fuzz-contract`), where a new finding never blocks an unrelated change.
+deterministic = true
+# Unknown query parameters are deliberately ignored by both APIs (cache
+# busters, tracking parameters). Unknown *body* fields are rejected.
+allow-extra-parameters = false
+# NUL characters are rejected by contract (PostgreSQL text cannot store them);
+# both backends are tested for that directly in their own suites.
+allow-x00 = false
+
+# Business rules a schema cannot express: password strength, and opaque
+# cursors (any string is schema-valid, only server-issued ones are real).
+[[operations]]
+include-operation-id = "register"
+checks.positive_data_acceptance.expected-statuses = ["2xx", "422"]
+
+[[operations]]
+include-operation-id = ["listPosts", "listComments"]
+checks.positive_data_acceptance.expected-statuses = ["2xx", "404", "422"]

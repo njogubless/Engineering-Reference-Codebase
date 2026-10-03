@@ -16,6 +16,8 @@ Dio createDio(
   HttpClientAdapter? adapter,
   Future<void> Function(Duration)? sleep,
   double Function()? random,
+  String? Function()? accessToken,
+  void Function()? onUnauthorized,
 }) {
   final dio = Dio(
     BaseOptions(
@@ -29,6 +31,8 @@ Dio createDio(
   if (adapter != null) dio.httpClientAdapter = adapter;
   dio.interceptors.addAll([
     RequestIdInterceptor(),
+    if (accessToken != null)
+      AuthInterceptor(accessToken: accessToken, onUnauthorized: onUnauthorized ?? () {}),
     LoggingInterceptor(logger),
     RetryInterceptor(dio: dio, sleep: sleep, random: random),
   ]);
@@ -48,6 +52,7 @@ class ApiClient {
   Future<Object?> get(
     String path, {
     Map<String, Object?>? query,
+    Map<String, String>? headers,
     CancelToken? cancelToken,
     int? retries,
     Set<int>? acceptStatuses,
@@ -55,6 +60,7 @@ class ApiClient {
     'GET',
     path,
     query: query,
+    headers: headers,
     cancelToken: cancelToken,
     retries: retries,
     acceptStatuses: acceptStatuses,
@@ -76,6 +82,7 @@ class ApiClient {
     String method,
     String path, {
     Map<String, Object?>? query,
+    Map<String, String>? headers,
     Object? body,
     String? idempotencyKey,
     CancelToken? cancelToken,
@@ -93,7 +100,7 @@ class ApiClient {
         cancelToken: cancelToken,
         options: Options(
           method: method,
-          headers: {'Idempotency-Key': ?idempotencyKey},
+          headers: {...?headers, 'Idempotency-Key': ?idempotencyKey},
           extra: {RequestExtras.retries: ?retries},
           validateStatus: acceptStatuses == null
               ? null

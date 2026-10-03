@@ -21,15 +21,30 @@ echo "→ Linting contract"
 npx --yes @stoplight/spectral-cli@6 lint "$ROOT/contracts/openapi.yaml" \
   --ruleset "$ROOT/contracts/.spectral.yaml" --fail-severity=warn
 
+# Throwaway databases: Schemathesis creates random data, which must never
+# land in a development database.
+PG="postgresql://reference:reference@localhost:5433"
+for db in django_contract fastapi_contract; do
+  psql "$PG/reference" -q -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
+done
+export DJANGO_DATABASE_URL="$PG/django_contract"
+export FASTAPI_DATABASE_URL="$PG/fastapi_contract"
+
+echo "→ Migrating"
+(cd "$ROOT/django/reference_api" && DJANGO_ENV_FILE=.env.test DATABASE_URL="$DJANGO_DATABASE_URL" \
+  .venv/bin/python manage.py migrate -v0)
+(cd "$ROOT/fastapi/reference_api" && FASTAPI_ENV_FILE=.env.test DATABASE_URL="$FASTAPI_DATABASE_URL" \
+  .venv/bin/alembic upgrade head >/dev/null 2>&1)
+
 echo "→ Starting Django on :$DJANGO_PORT"
 # `exec` replaces the subshell with the server, so `$!` is the server's PID and
 # the cleanup trap really stops it (without exec, only the subshell is killed).
-(cd "$ROOT/django/reference_api" && DJANGO_ENV_FILE=.env.test \
+(cd "$ROOT/django/reference_api" && DJANGO_ENV_FILE=.env.test DATABASE_URL="$DJANGO_DATABASE_URL" \
   exec .venv/bin/python manage.py runserver "$DJANGO_PORT" --noreload >/tmp/contract-django.log 2>&1) &
 PIDS+=($!)
 
 echo "→ Starting FastAPI on :$FASTAPI_PORT"
-(cd "$ROOT/fastapi/reference_api" && FASTAPI_ENV_FILE=.env.test \
+(cd "$ROOT/fastapi/reference_api" && FASTAPI_ENV_FILE=.env.test DATABASE_URL="$FASTAPI_DATABASE_URL" \
   exec .venv/bin/uvicorn app.main:create_app --factory --port "$FASTAPI_PORT" >/tmp/contract-fastapi.log 2>&1) &
 PIDS+=($!)
 
@@ -47,4 +62,4 @@ wait_for "http://localhost:$FASTAPI_PORT"
 echo "→ Running contract tests"
 cd "$ROOT/tests/contract"
 DJANGO_BASE_URL="http://localhost:$DJANGO_PORT" FASTAPI_BASE_URL="http://localhost:$FASTAPI_PORT" \
-  .venv/bin/pytest -q
+  .venv/bin/pytest -q "$@"

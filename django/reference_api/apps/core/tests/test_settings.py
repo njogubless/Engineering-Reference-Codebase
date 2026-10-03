@@ -44,7 +44,8 @@ def test_valid_production_settings_load():
         ({"DATABASE_URL": None}, "DATABASE_URL"),
         ({"ENVIRONMENT": "prod"}, "ENVIRONMENT must be one of"),
         ({"DEBUG": "true"}, "DEBUG must be off"),
-        ({"SECRET_KEY": "short"}, "SECRET_KEY is too weak"),
+        ({"SECRET_KEY": "short"}, "at least 32 bytes"),
+        ({"SECRET_KEY": "django-insecure-" + "x" * 40}, "SECRET_KEY is too weak"),
     ],
 )
 def test_invalid_settings_fail_at_startup(overrides, message):
