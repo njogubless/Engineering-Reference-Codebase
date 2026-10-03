@@ -29,7 +29,7 @@ jobs:
         ports: ["6380:6379"]
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Create the FastAPI database
         run: PGPASSWORD=reference psql -h localhost -p 5433 -U reference -c 'CREATE DATABASE fastapi_reference'
       - uses: actions/setup-python@v5
