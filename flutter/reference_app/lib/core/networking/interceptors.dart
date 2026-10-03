@@ -146,3 +146,31 @@ class RetryInterceptor extends Interceptor {
     return seconds == null || seconds < 0 ? null : Duration(seconds: seconds);
   }
 }
+
+/// Adds `Authorization: Bearer <token>` when a session exists.
+///
+/// The token is read at request time through [accessToken], never captured
+/// once, so signing in or out takes effect on the very next request. A 401 on
+/// a request that carried a token means the session is no longer valid:
+/// [onUnauthorized] ends it (Phase 3 replaces this with a single-flight refresh).
+class AuthInterceptor extends Interceptor {
+  AuthInterceptor({required this.accessToken, required this.onUnauthorized});
+
+  final String? Function() accessToken;
+  final void Function() onUnauthorized;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final token = accessToken();
+    if (token != null) options.headers.putIfAbsent('Authorization', () => 'Bearer $token');
+    handler.next(options);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response?.statusCode == 401 && err.requestOptions.headers.containsKey('Authorization')) {
+      onUnauthorized();
+    }
+    handler.next(err);
+  }
+}

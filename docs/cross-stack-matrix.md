@@ -15,7 +15,7 @@ must pass are in [implementation-roadmap.md § Definition of Done](implementatio
 `Platform` = Firebase rules/emulator, Docker, CI, Postgres/Redis configuration, or `contracts/`.
 `Docs` = concept README in `docs/patterns/` or `docs/common-problems/`.
 
-_Last verified: 2026-10-02 (Phase 2a) — `make check` green: Django 117 tests, FastAPI 88, React 58, Flutter 36, contract 48 (authenticated, deterministic Schemathesis on both backends)._
+_Last verified: 2026-10-03 (end of Phase 2) — `make check` green: Django 117 tests, FastAPI 88, React 74, Flutter 65, contract 48 (authenticated, deterministic Schemathesis on both backends); React verified against the seeded Django API in a browser._
 
 ## Foundations & cross-cutting
 
@@ -49,25 +49,30 @@ _Last verified: 2026-10-02 (Phase 2a) — `make check` green: Django 117 tests, 
 | Pattern | Flutter | React | Django | FastAPI | Platform | Docs | Phase |
 |---|---|---|---|---|---|---|---|
 | Domain models, constraints, indexes, migrations | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | 2a |
-| CRUD resource (Posts/Comments) | ⬜ | ⬜ | ✅ | ✅ | ✅ | 🟨 ⁵ | 2a/2b |
+| CRUD resource (Posts/Comments) | 🟨 ¹⁰ | ✅ | ✅ | ✅ | ✅ | ✅ | 2a/2b |
 | Contract conformance tests (authenticated Schemathesis, error parity) | ➖ | ➖ | ✅ | ✅ | ✅ | ✅ | 2a |
-| Generated client types from OpenAPI | ⬜ | ✅ | ➖ | ➖ | ✅ | ✅ | 2 |
-| DTO ↔ entity mapping | ⬜ | ⬜ | ✅ | ✅ | ➖ | ⬜ | 2 |
-| Repository / data source layering | ⬜ | ⬜ | ✅ | ✅ | ➖ | ⬜ | 2 |
-| Firestore CRUD, streams, queries, ordering | ⬜ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 2 |
-| Firestore transactions, batched writes, subcollections | ⬜ | ➖ | ➖ | ➖ | ⬜ | ⬜ | 2 |
-| Riverpod provider types (each with a reason) | ⬜ | ➖ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| Async UI states (loading/success/error/empty/refreshing) | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| Server-state cache + invalidation | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| State categories (local/server/form/URL/global) | ➖ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| Optimistic update + rollback | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 2 |
-| Date/time handling (UTC wire, local display) | ⬜ | ⬜ | ✅ | ✅ | ➖ | 🟨 | 2 |
+| Generated client types from OpenAPI | ➖ ¹¹ | ✅ | ➖ | ➖ | ✅ | ✅ | 2 |
+| DTO ↔ entity mapping | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | 2 |
+| Repository / data source layering | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | 2 |
+| Firestore CRUD, streams, queries, ordering | 🧪 | ➖ | ➖ | ➖ | ⬜ | ✅ | 2b/3 |
+| Firestore transactions, batched writes, subcollections | 🧪 | ➖ | ➖ | ➖ | ⬜ | ✅ | 2b/3 |
+| Riverpod provider types (each with a reason) | 🟨 ¹² | ➖ | ➖ | ➖ | ➖ | ✅ | 2b |
+| Async UI states (loading/success/error/empty/refreshing) | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | 2b |
+| Server-state cache + invalidation | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | 2b |
+| State categories (local/server/form/URL/global) | ➖ | 🟨 ¹³ | ➖ | ➖ | ➖ | ✅ | 2b |
+| Optimistic update + rollback | ✅ | ✅ | ➖ | ➖ | ➖ | ✅ | 2b |
+| Date/time handling (UTC wire, local display) | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | 2 |
 
-⁵ Backends complete; React and Flutter clients arrive in Phase 2b. A dedicated data-access README (08) comes with 2b.
 ⁶ Register, login, logout and `/me` are done; password reset and email verification need transactional email (Phase 3 with Mailpit).
 ⁷ Author-only writes; visible-but-not-yours → 403, invisible → 404. Roles and RBAC are Phase 4.
 ⁸ Query counts are asserted (1 per post page; FastAPI relationships use `lazy="raise"`), but the bad-vs-good demo is Phase 7.
 ⁹ Argon2id with constant-time-equivalent login (dummy hash for unknown emails); brute-force throttling is Phase 14.
+
+¹⁰ Flutter lists, reads and publishes/unpublishes against the API; creating, editing and deleting from the UI comes with forms in Phase 5 (the repository already implements them, and they are tested).
+¹¹ Flutter DTOs are hand-written by decision ([36-api-contracts](patterns/36-api-contracts/README.md)).
+¹² `StreamProvider` is used with Firestore in Phase 3; every other type listed in the guide is in use and tested.
+¹³ Local, server, session and form state are in place; URL state arrives with routing (Phase 4) and filters (Phase 6).
+¹⁴ "Load more" button + cursor; infinite scroll on scroll position and virtualization are Phase 6.
 
 ## Authentication
 
@@ -110,9 +115,9 @@ _Last verified: 2026-10-02 (Phase 2a) — `make check` green: Django 117 tests, 
 | Async + server validation → field errors | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 5 |
 | Double-submit prevention | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 5 |
 | Offset pagination | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 6 |
-| Cursor / keyset pagination | ⬜ | ⬜ | ✅ | ✅ | ➖ | ✅ | 2a |
-| Firestore cursor pagination | ⬜ | ➖ | ➖ | ➖ | ➖ | ⬜ | 6 |
-| Infinite scroll, pull-to-refresh, end-of-list, dedupe | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 6 |
+| Cursor / keyset pagination | ✅ | ✅ | ✅ | ✅ | ➖ | ✅ | 2a/2b |
+| Firestore cursor pagination | 🧪 | ➖ | ➖ | ➖ | ➖ | ✅ | 2b |
+| Infinite scroll, pull-to-refresh, end-of-list, dedupe | ✅ | 🟨 ¹⁴ | ➖ | ➖ | ➖ | ✅ | 2b/6 |
 | Unbounded query (bad vs good) | ➖ | ➖ | ⬜ | ⬜ | ➖ | ⬜ | 6 |
 | Debounced, race-free search + history | ⬜ | ⬜ | ➖ | ➖ | ➖ | ⬜ | 6 |
 | Filtering + sorting (whitelisted) | ⬜ | ⬜ | ⬜ | ⬜ | ➖ | ⬜ | 6 |

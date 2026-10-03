@@ -448,16 +448,6 @@ components:
           minimum: 0
           description: Seconds until retrying is useful (only for `rate_limited`).
 
-    CursorPage:
-      type: object
-      description: Base shape for keyset-paginated lists. Concrete lists narrow `items` via allOf.
-      required: [items, next_cursor]
-      properties:
-        items: { type: array, items: {} }
-        next_cursor:
-          type: [string, "null"]
-          description: Opaque cursor for the next page; null at the end of the list.
-
     User:
       type: object
       additionalProperties: false
@@ -549,13 +539,19 @@ components:
         status: { $ref: "#/components/schemas/PostStatus" }
 
     PostPage:
-      allOf:
-        - $ref: "#/components/schemas/CursorPage"
-        - type: object
-          properties:
-            items:
-              type: array
-              items: { $ref: "#/components/schemas/Post" }
+      # OpenAPI has no generics. A shared "CursorPage" base narrowed with allOf
+      # generates `unknown[] & Post[]` in TypeScript; explicit page schemas
+      # generate clean types.
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page; null at the end of the list.
 
     Comment:
       type: object
@@ -576,13 +572,16 @@ components:
         body: { type: string, minLength: 1, maxLength: 2000, pattern: *non_blank }
 
     CommentPage:
-      allOf:
-        - $ref: "#/components/schemas/CursorPage"
-        - type: object
-          properties:
-            items:
-              type: array
-              items: { $ref: "#/components/schemas/Comment" }
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Comment" }
+        next_cursor:
+          type: [string, "null"]
+          description: Opaque cursor for the next page; null at the end of the list.
 
     Liveness:
       type: object

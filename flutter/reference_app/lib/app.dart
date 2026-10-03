@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/config/app_config.dart';
-import 'features/diagnostics/presentation/diagnostics_screen.dart';
+import 'features/home/home_screen.dart';
 
 class ReferenceApp extends StatelessWidget {
   const ReferenceApp({super.key});
@@ -11,7 +11,7 @@ class ReferenceApp extends StatelessWidget {
     title: 'Reference App',
     theme: ThemeData(colorSchemeSeed: Colors.indigo),
     darkTheme: ThemeData(colorSchemeSeed: Colors.indigo, brightness: Brightness.dark),
-    home: const DiagnosticsScreen(),
+    home: const HomeScreen(),
   );
 }
 

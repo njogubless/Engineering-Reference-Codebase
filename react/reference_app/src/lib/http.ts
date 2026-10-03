@@ -51,6 +51,17 @@ export interface HttpClientConfig {
   /** Injected for tests; default real timers / Math.random. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
+  /**
+   * Current access token, read at request time (never captured once), so a
+   * sign-in or sign-out takes effect for the very next request.
+   */
+  getAccessToken?: () => string | null;
+  /**
+   * Called when a request that carried a token is rejected with 401: the
+   * session is no longer valid. Phase 3 replaces "sign out" with a
+   * single-flight token refresh.
+   */
+  onUnauthorized?: () => void;
 }
 
 export interface HttpClient {
@@ -87,6 +98,8 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
     };
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
     if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+    const token = config.getAccessToken?.() ?? null;
+    if (token !== null && headers.Authorization === undefined) headers.Authorization = `Bearer ${token}`;
 
     const canRetry = IDEMPOTENT_METHODS.has(method) || Boolean(options.idempotencyKey);
     const maxAttempts = canRetry ? (options.retries ?? retry.retries) + 1 : 1;
@@ -116,6 +129,7 @@ export function createHttpClient(config: HttpClientConfig): HttpClient {
         return await parseResponse<T>(response);
       } catch (error) {
         const appError = error instanceof AppError ? error : unexpected(error);
+        if (appError.status === 401 && token !== null) config.onUnauthorized?.();
         if (attempt >= maxAttempts || !isRetryableError(appError)) throw appError;
         const delay = backoffDelay(attempt, retry, random, appError.retryAfterSeconds);
         logger.info('http_retry', { method, path, attempt, delayMs: delay, code: appError.code, requestId });
