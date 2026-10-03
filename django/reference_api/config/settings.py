@@ -43,7 +43,33 @@ if len(SECRET_KEY.encode()) < 32:
 DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS: list[str] = env.list("ALLOWED_HOSTS", default=[])
 
+# --- Firebase -------------------------------------------------------------------
+# Verifying ID tokens needs only the project id. The emulator host makes
+# firebase-admin accept unsigned emulator tokens: never in a deployed environment.
+FIREBASE_PROJECT_ID = env.str("FIREBASE_PROJECT_ID")
+FIREBASE_AUTH_EMULATOR_HOST = env.str("FIREBASE_AUTH_EMULATOR_HOST", default="")
+
+# --- Email ------------------------------------------------------------------------
+EMAIL_HOST = env.str("EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("EMAIL_PORT", default=1025)  # Mailpit in development
+EMAIL_HOST_USER = env.str("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
+EMAIL_TIMEOUT = 10  # seconds: a stuck SMTP server must not hang a request
+DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL", default="Reference <no-reply@reference.test>")
+# Where links in emails point (the web client).
+FRONTEND_BASE_URL = env.str("FRONTEND_BASE_URL").rstrip("/")
+PASSWORD_RESET_TIMEOUT = 60 * 60  # one hour
+
 if ENVIRONMENT in ("staging", "production"):
+    if FIREBASE_AUTH_EMULATOR_HOST:
+        raise ImproperlyConfigured(
+            "FIREBASE_AUTH_EMULATOR_HOST must not be set in staging/production."
+        )
+    if FIREBASE_PROJECT_ID.startswith("demo-"):
+        raise ImproperlyConfigured("FIREBASE_PROJECT_ID is an emulator-only demo project.")
+    if not FRONTEND_BASE_URL.startswith("https://"):
+        raise ImproperlyConfigured("FRONTEND_BASE_URL must use https in staging/production.")
     if DEBUG:
         raise ImproperlyConfigured("DEBUG must be off in staging/production.")
     if len(SECRET_KEY) < 50 or SECRET_KEY.startswith("django-insecure"):

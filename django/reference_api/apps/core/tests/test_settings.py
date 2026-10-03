@@ -17,6 +17,8 @@ BASE_ENV = {
     "REDIS_URL": "redis://localhost:6380/0",
     "SECRET_KEY": "x" * 60,
     "ENVIRONMENT": "production",
+    "FIREBASE_PROJECT_ID": "reference-prod",
+    "FRONTEND_BASE_URL": "https://app.example.com",
 }
 
 
@@ -45,6 +47,9 @@ def test_valid_production_settings_load():
         ({"ENVIRONMENT": "prod"}, "ENVIRONMENT must be one of"),
         ({"DEBUG": "true"}, "DEBUG must be off"),
         ({"SECRET_KEY": "short"}, "at least 32 bytes"),
+        ({"FIREBASE_AUTH_EMULATOR_HOST": "127.0.0.1:9099"}, "must not be set"),
+        ({"FIREBASE_PROJECT_ID": "demo-reference"}, "emulator-only"),
+        ({"FRONTEND_BASE_URL": "http://app.example.com"}, "must use https"),
         ({"SECRET_KEY": "django-insecure-" + "x" * 40}, "SECRET_KEY is too weak"),
     ],
 )

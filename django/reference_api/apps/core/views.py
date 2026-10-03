@@ -50,6 +50,12 @@ class PublicAPIView(APIView):
     authentication_classes = ()
     permission_classes = (AllowAny,)
 
+    def get_authenticate_header(self, request: Request) -> str:
+        # Without a challenge, DRF turns AuthenticationFailed into a 403.
+        # Public endpoints that check credentials (the Firebase exchange)
+        # must answer 401, as simplejwt's own views do.
+        return 'Bearer realm="api"'
+
 
 class LivenessView(PublicAPIView):
     """Is the process alive? Never checks dependencies: if the database is down,

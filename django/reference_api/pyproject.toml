@@ -33,7 +33,7 @@ plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 exclude = ["\\.venv/"]
 
 [[tool.mypy.overrides]]
-module = ["environ.*"]
+module = ["environ.*", "firebase_admin.*"]  # no type information published
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -41,6 +41,7 @@ ignore_missing_imports = true
 module = ["apps.*.tests.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_calls = false
 warn_return_any = false
 
 [tool.django-stubs]
@@ -48,5 +49,8 @@ django_settings_module = "config.test_settings"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.test_settings"
-addopts = "--strict-markers -p no:cacheprovider"
+# `firebase` tests need the Auth emulator: `make check-firebase` runs them
+# inside `firebase emulators:exec`. Everything else runs in `make check-django`.
+addopts = "--strict-markers -p no:cacheprovider -m 'not firebase'"
+markers = ["firebase: needs the Firebase Auth emulator (make check-firebase)"]
 filterwarnings = ["error"]

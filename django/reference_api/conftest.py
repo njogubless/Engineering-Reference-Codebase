@@ -62,3 +62,26 @@ def make_post(user: User) -> Callable[..., Post]:
         )
 
     return make
+
+
+@pytest.fixture
+def run_commit_hooks(django_capture_on_commit_callbacks: Any) -> Callable[[APIClient], APIClient]:
+    """Make an API client run `transaction.on_commit` callbacks (emails) right
+    after each request, as a real commit would.
+
+    Tests run inside a transaction that is rolled back, so on_commit callbacks
+    never fire on their own. `transaction=True` tests would fire them, but
+    flushing every table after each test costs ~2 s per test.
+    """
+
+    def wrap(api: APIClient) -> APIClient:
+        original = api.generic
+
+        def generic(*args: Any, **kwargs: Any) -> Any:
+            with django_capture_on_commit_callbacks(execute=True):
+                return original(*args, **kwargs)
+
+        api.generic = generic  # type: ignore[method-assign]
+        return api
+
+    return wrap

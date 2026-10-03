@@ -33,7 +33,13 @@ class TestRegister:
         assert response.status_code == 201
         body = response.json()
         assert body["email"] == "ada@example.com"
-        assert set(body) == {"id", "email", "display_name", "date_joined"}  # never the password
+        assert set(body) == {
+            "id",
+            "email",
+            "email_verified",
+            "display_name",
+            "date_joined",
+        }  # never the password
         user = User.objects.get()
         assert user.password != PASSWORD and user.check_password(PASSWORD)
 

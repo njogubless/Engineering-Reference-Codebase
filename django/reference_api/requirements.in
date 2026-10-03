@@ -9,3 +9,4 @@ redis>=5.2                # Redis cache backend + readiness probe
 django-cors-headers>=4.6  # CORS for browser clients on other origins (React, Flutter web)
 djangorestframework-simplejwt>=5.3  # access/refresh JWTs with rotation + blacklist (idiomatic DRF choice)
 argon2-cffi>=23.1         # Argon2id password hashing (Django's recommended hasher)
+firebase-admin>=6.6       # verifies Firebase ID tokens (and sends FCM in Phase 12)

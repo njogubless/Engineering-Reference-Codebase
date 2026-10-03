@@ -10,7 +10,7 @@ from apps.core.serializers import StrictInputMixin
 class UserSerializer(serializers.ModelSerializer[User]):
     class Meta:
         model = User
-        fields = ("id", "email", "display_name", "date_joined")
+        fields = ("id", "email", "email_verified", "display_name", "date_joined")
         read_only_fields = fields
 
 
@@ -34,3 +34,26 @@ class ObtainTokenSerializer(TokenObtainPairSerializer):
 
 class LogoutSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
     refresh = serializers.CharField(max_length=1024)
+
+
+class FirebaseTokenSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
+    # The token is the ONLY input: no uid, no email. Identity comes from verification.
+    id_token = serializers.CharField(max_length=4096)
+
+
+class ChangePasswordSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
+    current_password = serializers.CharField(max_length=128, trim_whitespace=False)
+    new_password = serializers.CharField(min_length=10, max_length=128, trim_whitespace=False)
+
+
+class PasswordResetRequestSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
+    email = serializers.EmailField(max_length=254)
+
+
+class PasswordResetConfirmSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
+    token = serializers.CharField(max_length=1024)
+    password = serializers.CharField(min_length=10, max_length=128, trim_whitespace=False)
+
+
+class TokenOnlySerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
+    token = serializers.CharField(max_length=1024)
