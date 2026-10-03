@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create the FastAPI database
         run: PGPASSWORD=reference psql -h localhost -p 5433 -U reference -c 'CREATE DATABASE fastapi_reference'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
