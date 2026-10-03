@@ -314,12 +314,6 @@ export interface components {
       /** @description Seconds until retrying is useful (only for `rate_limited`). */
       retry_after?: number;
     };
-    /** @description Base shape for keyset-paginated lists. Concrete lists narrow `items` via allOf. */
-    CursorPage: {
-      items: unknown[];
-      /** @description Opaque cursor for the next page; null at the end of the list. */
-      next_cursor: string | null;
-    };
     User: {
       /** Format: uuid */
       id: string;
@@ -385,8 +379,10 @@ export interface components {
       body?: string;
       status?: components['schemas']['PostStatus'];
     };
-    PostPage: components['schemas']['CursorPage'] & {
-      items?: components['schemas']['Post'][];
+    PostPage: {
+      items: components['schemas']['Post'][];
+      /** @description Opaque cursor for the next page; null at the end of the list. */
+      next_cursor: string | null;
     };
     Comment: {
       /** Format: uuid */
@@ -401,8 +397,10 @@ export interface components {
     CommentCreate: {
       body: string;
     };
-    CommentPage: components['schemas']['CursorPage'] & {
-      items?: components['schemas']['Comment'][];
+    CommentPage: {
+      items: components['schemas']['Comment'][];
+      /** @description Opaque cursor for the next page; null at the end of the list. */
+      next_cursor: string | null;
     };
     Liveness: {
       /** @constant */

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/auth/application/session_controller.dart';
 import 'config/app_config.dart';
 import 'logging/app_logger.dart';
 import 'networking/api_client.dart';
@@ -17,7 +18,14 @@ final loggerProvider = Provider<AppLogger>((ref) => AppLogger());
 /// `Provider` (not Future/Notifier): a synchronously built, long-lived object.
 /// Tests override it to inject a fake HTTP adapter.
 final dioProvider = Provider<Dio>((ref) {
-  final dio = createDio(ref.watch(appConfigProvider), ref.watch(loggerProvider));
+  final dio = createDio(
+    ref.watch(appConfigProvider),
+    ref.watch(loggerProvider),
+    // `ref.read`, not `watch`: read at request time, so a session change
+    // never rebuilds the HTTP client (and auth -> dio -> auth has no cycle).
+    accessToken: () => ref.read(sessionProvider)?.access,
+    onUnauthorized: () => ref.read(sessionProvider.notifier).expire(),
+  );
   ref.onDispose(dio.close);
   return dio;
 });

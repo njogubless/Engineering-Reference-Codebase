@@ -18,6 +18,10 @@ Point at FastAPI instead: `VITE_API_BASE_URL=http://localhost:8420` in `.env.loc
 | `src/lib/api/schema.d.ts`   | types generated from the contract (`pnpm gen:api`)                                             |
 | `src/app/providers.tsx`     | services through context; TanStack Query with retries off (one retry layer)                    |
 | `src/app/ErrorBoundary.tsx` | render-error boundary; global capture in `main.tsx`                                            |
+| `src/app/routes.tsx`        | one route table for the browser router and tests (memory router)                               |
+| `src/features/auth/`        | minimal session: sign-in, guard, sign-out that revokes and clears the cache                    |
+| `src/features/posts/`       | query-key factory, cursor infinite query, optimistic update/delete with rollback               |
+| `src/lib/time.ts`           | UTC on the wire, local display (DST-tested)                                                    |
 | `src/features/diagnostics/` | Phase 1 demo: config, flags, readiness, error handling end to end                              |
 
 Tests use MSW, so the real `fetch` code path runs against mocked network responses.

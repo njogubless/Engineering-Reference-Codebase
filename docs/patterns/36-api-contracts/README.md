@@ -55,7 +55,7 @@ API has dozens of models. That alternative is documented, not adopted.
 - Errors: `Problem` (RFC 9457) with the `ErrorCode` enum ([30-error-handling](../30-error-handling/README.md)).
 - Versioning: `/api/v1/...` (health probes are unversioned).
 - `X-Request-ID` header on every response.
-- Pagination: `CursorPage` with `next_cursor` (see [11-pagination](../11-pagination/README.md)).
+- Pagination: explicit `PostPage`/`CommentPage` schemas with `next_cursor` (no allOf "generics": they generate `unknown[]`) (see [11-pagination](../11-pagination/README.md)).
 - Security: bearer JWT by default (top-level `security`); public operations opt out with `security: []`.
 - Input strictness: unknown body fields → 422 `unknown_field`; wrong JSON types are
   rejected, never coerced; NUL and unpaired surrogates → 422; unknown query

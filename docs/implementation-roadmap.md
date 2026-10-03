@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-> Status: **Phase 2a complete** (2026-10-02). Phase 2b (clients) is next.
+> Status: **Phase 2 complete** (2026-10-03). Phase 3 (client authentication, Firebase) is next.
 > Status per pattern is tracked only in [cross-stack-matrix.md](cross-stack-matrix.md).
 
 ## Definition of Done
@@ -172,17 +172,33 @@ identity ships with the data layer. Verified 2026-10-02 by `make check`
 - Contract: auth and posts operations; authenticated Schemathesis on both backends.
   Its findings and fixes are listed in [36-api-contracts](patterns/36-api-contracts/README.md#what-the-contract-tests-found).
 
-### Phase 2b (next): clients on real data
+### Phase 2b: delivered (clients on real data)
 
-1. **React:** sign-in (email/password against the backend; access token in
-   memory, refresh token handling kept minimal and replaced by the full
-   architecture in Phase 3); a `posts` feature with TanStack Query (query-key
-   factory, cursor `useInfiniteQuery`, create/edit/delete with invalidation,
-   optimistic update + rollback), async UI states, local-time display.
-2. **Flutter:** the same against the REST API: repository + DTO mapping,
-   Riverpod provider guide (each provider type with its reason), paginated
-   list, optimistic update. Firebase emulator setup with a Firestore data
-   source (CRUD, streams, queries, transactions, batched writes,
-   subcollections) behind a repository interface. That interface is
-   justified here: two real implementations.
-3. **Docs:** 06-state-management, 08-data-access, 41 time handling.
+- **React:** React Router (basic routes), minimal session (in-memory tokens,
+  sign-in returning to the guarded page, sign-out that revokes and clears the
+  cache, 401 ends the session); posts with a query-key factory, cursor
+  `useInfiniteQuery`, optimistic publish and delete with rollback (tests
+  mutation-checked), server field errors next to fields, local-time display
+  with a DST test. Verified against the seeded Django API in a browser.
+- **Flutter:** auth interceptor reading the session at request time; session
+  `Notifier`; `PostsRepository` interface with REST and Firestore
+  implementations; `AsyncNotifier` infinite list (concurrent load-more guard,
+  dedupe, load-more errors kept separate, pull-to-refresh, optimistic publish
+  with rollback); Firestore: denormalised authors, transactional comment
+  counts, batched publishing, cascading delete by hand, `startAfterDocument`
+  cursors, streams, server timestamps. Verified with `fake_cloud_firestore` (🧪).
+- **Docs:** 06-state-management (with the Riverpod provider guide), 08-data-access, 41-money-time.
+
+### Phase 3 (next): client authentication and Firebase
+
+1. **Firebase emulators** (`firebase/`): Auth + Firestore with security rules
+   that require `request.auth`; the Flutter Firestore repository runs against
+   them (🧪 → ✅).
+2. **Flutter:** Firebase Auth email (register, verify, reset, change password,
+   delete account), Google, phone OTP; the auth state machine
+   (`Authenticated | Unauthenticated | EmailVerificationRequired | PhoneVerification | ...`);
+   session restoration; `flutter_secure_storage` for first-party tokens.
+3. **Backends:** Firebase ID-token verification mapped to local users (never trusting a client-sent uid); password reset and email verification via Mailpit.
+4. **React:** the refresh architecture (access token in memory, refresh token
+   in an httpOnly cookie or memory, decided in an ADR), single-flight refresh
+   on 401, session restoration; a Firebase auth adapter behind the same interface.
