@@ -1,6 +1,15 @@
 # Weekly dependency updates for every ecosystem in the repository.
-# Grouped minor/patch updates keep the PR volume manageable; majors arrive
-# individually because they usually need code changes.
+#
+# Minor/patch updates are grouped to keep PR volume manageable. Major
+# upgrades of pinned platform choices are ignored here on purpose: they are
+# decisions (and usually code changes), made in their own branch with an ADR,
+# not merged from a bot PR:
+#   - Django is pinned to the 5.2 LTS line (requirements.in: <5.3). Dependabot
+#     edits the compiled requirements.txt and would otherwise ignore that pin.
+#   - PostgreSQL and Redis majors change the data/runtime platform.
+#   - Flutter packages that need a newer Dart SDK than CI's pinned Flutter
+#     (3.41.4) fail `pub get` in CI; close those PRs and upgrade Flutter
+#     deliberately instead.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -8,6 +17,9 @@ updates:
     schedule: { interval: weekly }
     groups:
       minor-and-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: django
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: npm
     directory: /react/reference_app
@@ -28,3 +40,8 @@ updates:
   - package-ecosystem: docker-compose
     directory: /infrastructure/docker
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+      - dependency-name: redis
+        update-types: ["version-update:semver-major"]

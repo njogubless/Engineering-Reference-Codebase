@@ -25,7 +25,7 @@ npx --yes @stoplight/spectral-cli@6 lint "$ROOT/contracts/openapi.yaml" \
 # land in a development database.
 PG="postgresql://reference:reference@localhost:5433"
 for db in django_contract fastapi_contract; do
-  psql "$PG/reference" -q -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
+  psql "$PG/postgres" -q -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
 done
 export DJANGO_DATABASE_URL="$PG/django_contract"
 export FASTAPI_DATABASE_URL="$PG/fastapi_contract"
