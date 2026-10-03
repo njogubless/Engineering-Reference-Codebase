@@ -169,6 +169,131 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/firebase': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Exchange a Firebase ID token for this API's tokens.
+     * @description The client signs in with Firebase (email, Google, phone) and sends the
+     *     resulting ID token. The server verifies its signature, audience, issuer,
+     *     expiry and revocation, then maps the Firebase uid to a local user. User
+     *     identity comes only from the verified token, never from the request body.
+     *     An existing account with the same email is linked only if Firebase reports
+     *     the email as verified; otherwise 409 (prevents account takeover).
+     */
+    post: operations['exchangeFirebaseToken'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change the password of the signed-in user.
+     * @description Requires the current password. Revokes every refresh token (all other sessions) and returns a new pair for this one.
+     */
+    post: operations['changePassword'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/password-reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Email a password-reset link.
+     * @description Always 202, whether or not the email has an account, so the endpoint cannot be used to discover accounts.
+     */
+    post: operations['requestPasswordReset'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/password-reset/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set a new password with a reset token.
+     * @description Tokens expire after one hour and stop working once the password changes (single use). All sessions are revoked.
+     */
+    post: operations['confirmPasswordReset'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/email-verification': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Email a verification link to the signed-in user.
+     * @description 202 even if the email is already verified (idempotent).
+     */
+    post: operations['requestEmailVerification'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/email-verification/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mark the email as verified with a token from the link.
+     * @description The token is bound to the email it was sent to; changing the email invalidates it.
+     */
+    post: operations['confirmEmailVerification'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/posts': {
     parameters: {
       query?: never;
@@ -317,8 +442,12 @@ export interface components {
     User: {
       /** Format: uuid */
       id: string;
-      /** Format: email */
-      email: string;
+      /**
+       * Format: email
+       * @description Null for accounts created through phone sign-in.
+       */
+      email: string | null;
+      email_verified: boolean;
       display_name: string;
       /** Format: date-time */
       date_joined: string;
@@ -335,6 +464,24 @@ export interface components {
     };
     RefreshRequest: {
       refresh: string;
+    };
+    FirebaseTokenRequest: {
+      id_token: string;
+    };
+    ChangePasswordRequest: {
+      current_password: string;
+      new_password: string;
+    };
+    PasswordResetRequest: {
+      /** Format: email */
+      email: string;
+    };
+    PasswordResetConfirm: {
+      token: string;
+      password: string;
+    };
+    TokenOnlyRequest: {
+      token: string;
     };
     TokenPair: {
       /** @description Short-lived JWT for the Authorization header. */
@@ -650,6 +797,150 @@ export interface operations {
         content: {
           'application/json': components['schemas']['User'];
         };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  exchangeFirebaseToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FirebaseTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description Tokens issued. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TokenPair'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  changePassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangePasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description Password changed; other sessions signed out. */
+      200: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TokenPair'];
+        };
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  requestPasswordReset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordResetRequest'];
+      };
+    };
+    responses: {
+      /** @description If the account exists, an email is on its way. */
+      202: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  confirmPasswordReset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordResetConfirm'];
+      };
+    };
+    responses: {
+      /** @description Password changed; every session signed out. */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  requestEmailVerification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Email on its way (unless already verified). */
+      202: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      default: components['responses']['Problem'];
+    };
+  };
+  confirmEmailVerification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TokenOnlyRequest'];
+      };
+    };
+    responses: {
+      /** @description Verified. */
+      204: {
+        headers: {
+          'X-Request-ID': components['headers']['RequestId'];
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       default: components['responses']['Problem'];
     };
