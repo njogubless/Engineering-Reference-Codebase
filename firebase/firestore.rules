@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Phase 3 baseline: deny by default, authenticated writes only, authors own
+// their documents. Phase 4 completes these rules (field validation, roles)
+// and tests them with @firebase/rules-unit-testing.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /posts/{postId} {
+      allow read: if resource.data.status == 'published'
+                  || (request.auth != null && resource.data.authorId == request.auth.uid);
+      allow create: if request.auth != null
+                    && request.resource.data.authorId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid;
+      // Authors edit their posts; anyone signed in may only bump the comment
+      // counter by exactly one (done inside the add-comment transaction).
+      allow update: if request.auth != null && (
+        (resource.data.authorId == request.auth.uid
+          && request.resource.data.authorId == resource.data.authorId)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount'])
+          && request.resource.data.commentCount == resource.data.commentCount + 1)
+      );
+
+      match /comments/{commentId} {
+        allow read: if get(/databases/$(database)/documents/posts/$(postId)).data.status == 'published';
+        allow create: if request.auth != null
+                      && request.resource.data.authorId == request.auth.uid;
+        allow delete: if request.auth != null && (
+          resource.data.authorId == request.auth.uid
+          || get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid
+        );
+      }
+    }
+  }
+}
