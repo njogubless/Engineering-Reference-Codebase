@@ -45,6 +45,7 @@ export const ADA: Session = {
   user: {
     id: '01900000-0000-7000-8000-000000000001',
     email: 'ada@example.com',
+    email_verified: true,
     display_name: 'Ada',
     date_joined: '2026-01-01T00:00:00Z',
   },
