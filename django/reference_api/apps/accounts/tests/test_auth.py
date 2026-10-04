@@ -190,3 +190,13 @@ def test_passwords_are_not_trimmed_at_login(client):
     )
     response = client.post(TOKEN, {"email": "s@example.com", "password": password}, format="json")
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("email", ["a@x.test", "a@printer.local", "a@localhost"])
+def test_special_use_email_domains_are_rejected_like_fastapi(client, email):
+    """Found by Schemathesis: Django accepted these, FastAPI (EmailStr) did not."""
+    response = client.post(
+        REGISTER, {"email": email, "password": PASSWORD, "display_name": "X"}, format="json"
+    )
+    assert response.status_code == 422
+    assert response.json()["errors"][0]["field"] == "email"

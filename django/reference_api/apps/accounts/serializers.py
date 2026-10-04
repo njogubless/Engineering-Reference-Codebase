@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import PasswordField, TokenObtainPairSerializer
 
 from apps.accounts.models import User
+from apps.accounts.validators import validate_deliverable_domain
 from apps.core.serializers import StrictInputMixin
 
 
@@ -15,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
 
 class RegisterSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
-    email = serializers.EmailField(max_length=254)
+    email = serializers.EmailField(max_length=254, validators=[validate_deliverable_domain])
     password = serializers.CharField(
         min_length=10, max_length=128, write_only=True, trim_whitespace=False
     )
@@ -47,7 +48,7 @@ class ChangePasswordSerializer(StrictInputMixin, serializers.Serializer):  # typ
 
 
 class PasswordResetRequestSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
-    email = serializers.EmailField(max_length=254)
+    email = serializers.EmailField(max_length=254, validators=[validate_deliverable_domain])
 
 
 class PasswordResetConfirmSerializer(StrictInputMixin, serializers.Serializer):  # type: ignore[type-arg]
