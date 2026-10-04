@@ -2,17 +2,25 @@ import '../../../core/errors/app_error.dart';
 import '../../../core/networking/api_client.dart';
 
 final class User {
-  const User({required this.id, required this.email, required this.displayName});
+  const User({required this.id, required this.email, required this.displayName, this.emailVerified = false});
 
   factory User.fromJson(Object? json) {
-    if (json case {'id': final String id, 'email': final String email, 'display_name': final String name}) {
-      return User(id: id, email: email, displayName: name);
+    if (json case {
+      'id': final String id,
+      'email': final String? email,
+      'email_verified': final bool emailVerified,
+      'display_name': final String name,
+    }) {
+      return User(id: id, email: email, displayName: name, emailVerified: emailVerified);
     }
     throw const ParseError('Unexpected user shape.');
   }
 
   final String id;
-  final String email;
+
+  /// Null for accounts created through phone sign-in.
+  final String? email;
+  final bool emailVerified;
   final String displayName;
 }
 
