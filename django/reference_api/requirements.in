@@ -1,7 +1,7 @@
 # Runtime dependencies. Each one is justified in docs/implementation-roadmap.md
 # (Dependency strategy → Django). Add new entries only together with that table.
-django>=6.1.1,<6.2          # LTS
-djangorestframework>=3.16
+django>=6.1.2,<6.2          # LTS
+djangorestframework>=3.18.3
 psycopg[binary]>=3.2
 django-environ>=0.12      # env-driven, fail-fast settings
 drf-spectacular>=0.28     # OpenAPI generation, checked against contracts/openapi.yaml
